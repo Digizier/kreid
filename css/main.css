@@ -250,3 +250,25 @@ img {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent-gold);
 }
+
+/* Global Cross-Device Responsive Utilities */
+@media (max-width: 768px) {
+  #toast-container {
+    bottom: 1rem;
+    right: 1rem;
+    left: 1rem;
+  }
+
+  .toast {
+    font-size: 0.82rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .checkout-modal-card,
+  .modal-content {
+    width: 95% !important;
+    max-height: 90vh !important;
+    padding: 1.2rem !important;
+  }
+}
+

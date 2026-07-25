@@ -1,6 +1,6 @@
 /**
  * Header Component for KREID Storefront
- * Smooth Live Search Drawer with Real Product Image Thumbnails & Uninterrupted Typing Focus
+ * Smooth Live Search Drawer with Real Product Image Thumbnails & Mobile Hamburger Drawer Toggle
  */
 
 import { appStore } from '../store/appStore.js';
@@ -20,13 +20,20 @@ export function renderHeader(container, state) {
     <!-- Main Navigation Header -->
     <header class="site-header">
       <div class="container header-inner">
-        <!-- Brand Logo Image -->
-        <a href="#" class="brand-logo" id="logo-home" style="display: flex; align-items: center; gap: 0.8rem;">
-          <img src="assets/kreid-logo.svg" alt="KREID COUTURE" style="height: 52px; filter: drop-shadow(0 2px 8px rgba(212,175,55,0.3));" />
-        </a>
+        <div style="display: flex; align-items: center; gap: 0.8rem;">
+          <!-- Mobile Hamburger Toggle Button -->
+          <button class="mobile-menu-toggle" id="btn-mobile-menu-toggle" style="display: none; background: transparent; border: none; color: var(--accent-gold); font-size: 1.6rem; cursor: pointer; padding: 0.2rem;">
+            ☰
+          </button>
 
-        <!-- Navigation Links -->
-        <nav class="main-nav">
+          <!-- Brand Logo Image -->
+          <a href="#" class="brand-logo" id="logo-home" style="display: flex; align-items: center; gap: 0.8rem;">
+            <img src="assets/kreid-logo.svg" alt="KREID COUTURE" style="height: 52px; filter: drop-shadow(0 2px 8px rgba(212,175,55,0.3));" />
+          </a>
+        </div>
+
+        <!-- Navigation Links (Collapsible Drawer on Mobile) -->
+        <nav class="main-nav" id="storefront-main-nav">
           <a href="#" class="nav-link ${state.activeCategory === 'all' && !state.searchQuery ? 'active' : ''}" data-category="all">All Items</a>
           <a href="#" class="nav-link ${state.activeCategory === 'shoes' ? 'active' : ''}" data-category="shoes">Shoes</a>
           <a href="#" class="nav-link ${state.activeCategory === 'tshirts' ? 'active' : ''}" data-category="tshirts">T-Shirts</a>
@@ -103,9 +110,17 @@ export function renderHeader(container, state) {
     </div>
   `;
 
-  // Attach Navigation Listeners
+  // Attach Navigation & Mobile Drawer Toggle Handlers
+  const mobileToggle = container.querySelector('#btn-mobile-menu-toggle');
+  const mainNav = container.querySelector('#storefront-main-nav');
+
+  mobileToggle?.addEventListener('click', () => {
+    mainNav?.classList.toggle('mobile-active');
+  });
+
   container.querySelector('#logo-home')?.addEventListener('click', (e) => {
     e.preventDefault();
+    mainNav?.classList.remove('mobile-active');
     appStore.setCategory('all');
     appStore.setSearchQuery('');
   });
@@ -113,6 +128,7 @@ export function renderHeader(container, state) {
   container.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
+      mainNav?.classList.remove('mobile-active');
       appStore.setCategory(link.dataset.category);
       appStore.setSearchQuery('');
     });
@@ -162,7 +178,7 @@ export function renderHeader(container, state) {
     }
   });
 
-  // Local Live Typing without destroying DOM!
+  // Local Live Typing
   liveSearchInput?.addEventListener('input', (e) => {
     const q = e.target.value;
     renderLiveSearchResults(q.trim());
@@ -196,7 +212,7 @@ export function renderHeader(container, state) {
     renderLiveSearchResults('');
   });
 
-  // Render Matching Products Preview with Real High-Res Images
+  // Render Matching Products Preview
   function renderLiveSearchResults(query) {
     const products = state.products || [];
     let matches = products;
@@ -227,7 +243,7 @@ export function renderHeader(container, state) {
         <span>Found <strong style="color: var(--accent-gold); font-size: 1.05rem;">${matches.length}</strong> matching products${query ? ` for "${query}"` : ''}:</span>
       </div>
 
-      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1.4rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1.4rem;">
         ${matches.map(p => {
           const imgUrl = (p.images && p.images.length > 0) ? p.images[0] : (p.image || 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=400&q=80');
           return `
