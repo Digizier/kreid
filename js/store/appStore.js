@@ -5,8 +5,10 @@
 
 import { initialProducts } from '../data/products.js';
 import { initialCityRates } from '../data/pakistanCities.js';
+import { emailService } from '../services/emailService.js';
 
 class AppStore {
+
 
   constructor() {
     this.subscribers = [];
@@ -680,10 +682,16 @@ class AppStore {
       const eventKey = 'status_' + newStatus.toLowerCase();
       this.sendWhatsAppNotification(eventKey, order);
 
+      // Trigger Resend Email status notification automatically!
+      if (order.email) {
+        emailService.sendOrderStatusEmail(order, newStatus);
+      }
+
       this.showToast(`Order #${orderId} status updated to "${newStatus}"`, 'success');
       this.notify();
     }
   }
+
 
   saveProduct(productData) {
     if (productData.id) {

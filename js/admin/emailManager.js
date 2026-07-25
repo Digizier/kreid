@@ -154,11 +154,14 @@ export function renderEmailManager(container, state) {
             <div class="form-group">
               <label class="form-label">Select Pre-Built Template</label>
               <select id="manual-template-select" class="form-select">
-                <option value="receipt">🛍️ Order Confirmation Receipt</option>
-                <option value="shipped">🚚 Order Shipped Notification</option>
+                <option value="receipt">🛍️ Order Confirmation Receipt (Processing)</option>
+                <option value="shipped">🚚 Order Status: Shipped Notification</option>
+                <option value="delivered">🎉 Order Status: Delivered Notification</option>
+                <option value="cancelled">❌ Order Status: Cancelled Notification</option>
                 <option value="promo">🎟️ Promo Discount Offer (15% OFF)</option>
               </select>
             </div>
+
 
             <div class="form-group">
               <label class="form-label">Subject Line *</label>
@@ -313,24 +316,18 @@ export function renderEmailManager(container, state) {
       if (subjectInput) subjectInput.value = `🛍️ KREID Order Confirmation Receipt #${mockOrder.id}`;
       previewBox.innerHTML = emailService.generateOrderReceiptHTML(mockOrder);
     } else if (val === 'shipped') {
-      if (subjectInput) subjectInput.value = `🚚 Order #${mockOrder.id} Has Been Shipped - KREID COUTURE`;
-      previewBox.innerHTML = `
-        <div style="background: #0b0d11; color: #fff; padding: 25px; font-family: sans-serif; border: 1px solid #d4af37; border-radius: 8px;">
-          <h2 style="color: #d4af37; text-align: center;">KREID COUTURE</h2>
-          <h3 style="color: #ffffff;">Order Status: <span style="color: #d4af37;">SHIPPED</span></h3>
-          <p>Dear ${mockOrder.customerName},</p>
-          <p>Great news! Your KREID order <strong>#${mockOrder.id}</strong> has been handed over to <strong>Trax Logistics</strong>.</p>
-          <div style="background: #1b202c; padding: 15px; border-radius: 6px; margin: 15px 0;">
-            <div><strong>Tracking Number:</strong> <span style="color: #d4af37; font-weight: bold;">TRX-8827419</span></div>
-            <div><strong>Destination:</strong> ${mockOrder.address}, Lahore</div>
-          </div>
-          <p style="text-align: center; color: #9ca3af; font-size: 12px;">© 2026 KREID COUTURE SMC PVT LTD</p>
-        </div>
-      `;
+      if (subjectInput) subjectInput.value = `🚚 Order #${mockOrder.id} Status Updated to Shipped - KREID COUTURE`;
+      previewBox.innerHTML = emailService.generateOrderStatusHTML(mockOrder, 'Shipped');
+    } else if (val === 'delivered') {
+      if (subjectInput) subjectInput.value = `🎉 Order #${mockOrder.id} Status Updated to Delivered - KREID COUTURE`;
+      previewBox.innerHTML = emailService.generateOrderStatusHTML(mockOrder, 'Delivered');
+    } else if (val === 'cancelled') {
+      if (subjectInput) subjectInput.value = `❌ Order #${mockOrder.id} Status Updated to Cancelled - KREID COUTURE`;
+      previewBox.innerHTML = emailService.generateOrderStatusHTML(mockOrder, 'Cancelled');
     } else {
       if (subjectInput) subjectInput.value = `🎟️ Exclusive 15% OFF Promo Coupon - KREID COUTURE`;
       previewBox.innerHTML = `
-        <div style="background: #0b0d11; color: #fff; padding: 25px; font-family: sans-serif; border: 1px solid #d4af37; border-radius: 8px; text-align: center;">
+        <div style="background: #0b0d11; color: #fff; padding: 25px; font-family: sans-serif; border: 1.5px solid #d4af37; border-radius: 8px; text-align: center;">
           <h2 style="color: #d4af37;">KREID COUTURE</h2>
           <h3 style="color: #ffffff;">EXCLUSIVITY AWAITS YOU</h3>
           <p>Enjoy <strong>15% OFF</strong> your next luxury order with promo coupon code:</p>
@@ -341,6 +338,7 @@ export function renderEmailManager(container, state) {
         </div>
       `;
     }
+
   }
 
   tplSelect?.addEventListener('change', updateLivePreview);
