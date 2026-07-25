@@ -95,23 +95,24 @@
   box-shadow: 0 4px 12px rgba(212,175,55,0.3);
 }
 
-/* Mobile Responsive Storefront Rules */
-.logo-mobile-text {
-  display: none;
-  font-family: var(--font-heading);
-  font-weight: 800;
-  font-size: 1.15rem;
-  letter-spacing: 0.12em;
-  color: #ffffff;
+/* Desktop Header Defaults */
+.mobile-menu-toggle {
+  display: none !important;
 }
 
-.logo-mobile-text .gold {
-  color: var(--accent-gold);
+.logo-mobile-text {
+  display: none !important;
+}
+
+.logo-desktop-img {
+  display: block !important;
+  height: 52px;
 }
 
 .mobile-search-trigger {
-  display: none;
+  display: none !important;
 }
+
 
 @media (max-width: 992px) {
   .header-inner {
