@@ -1,6 +1,6 @@
 /**
  * Header Component for KREID Storefront
- * Smooth Live Search Drawer with Real Product Image Thumbnails & Mobile Hamburger Drawer Toggle
+ * Crisp Mobile Brand Text + Logo & Full-Width Luxury Search Drawer
  */
 
 import { appStore } from '../store/appStore.js';
@@ -20,15 +20,16 @@ export function renderHeader(container, state) {
     <!-- Main Navigation Header -->
     <header class="site-header">
       <div class="container header-inner">
-        <div style="display: flex; align-items: center; gap: 0.8rem;">
+        <div style="display: flex; align-items: center; gap: 0.6rem;">
           <!-- Mobile Hamburger Toggle Button -->
-          <button class="mobile-menu-toggle" id="btn-mobile-menu-toggle" style="display: none; background: transparent; border: none; color: var(--accent-gold); font-size: 1.6rem; cursor: pointer; padding: 0.2rem;">
+          <button class="mobile-menu-toggle" id="btn-mobile-menu-toggle" title="Menu Toggle">
             ☰
           </button>
 
-          <!-- Brand Logo Image -->
-          <a href="#" class="brand-logo" id="logo-home" style="display: flex; align-items: center; gap: 0.8rem;">
-            <img src="assets/kreid-logo.svg" alt="KREID COUTURE" style="height: 52px; filter: drop-shadow(0 2px 8px rgba(212,175,55,0.3));" />
+          <!-- Brand Logo -->
+          <a href="#" class="brand-logo" id="logo-home">
+            <img src="assets/kreid-logo.svg" alt="KREID COUTURE" class="logo-desktop-img" />
+            <span class="logo-mobile-text">KREID <span class="gold">COUTURE</span></span>
           </a>
         </div>
 
@@ -44,11 +45,16 @@ export function renderHeader(container, state) {
         <!-- Right Action Tray -->
         <div class="header-actions">
           <!-- Inline Search Bar -->
-          <div id="inline-search-bar-wrap" style="position: relative; display: flex; align-items: center; background: var(--bg-secondary); border: 1.5px solid var(--border-gold); border-radius: var(--radius-full); padding: 0.35rem 0.9rem; width: 220px; cursor: pointer;">
+          <div id="inline-search-bar-wrap" style="position: relative; display: flex; align-items: center; background: var(--bg-secondary); border: 1.5px solid var(--border-gold); border-radius: var(--radius-full); padding: 0.35rem 0.9rem; width: 200px; cursor: pointer;">
             <span style="font-size: 0.9rem; margin-right: 0.5rem; opacity: 0.7;">🔍</span>
             <input type="text" id="header-search-input" placeholder="Search catalog..." value="${state.searchQuery || ''}" style="width: 100%; background: transparent; border: none; outline: none; color: #ffffff; font-size: 0.85rem; font-family: inherit; cursor: pointer;" readonly />
             ${state.searchQuery ? `<button id="btn-clear-header-search" style="background: transparent; border: none; color: var(--text-muted); font-size: 0.85rem; cursor: pointer; padding: 0;">✕</button>` : ''}
           </div>
+
+          <!-- Search Icon for Mobile Screens -->
+          <button class="action-btn mobile-search-trigger" id="btn-mobile-search-trigger" title="Search">
+            🔍
+          </button>
 
           <!-- Favorites / Wishlist Icon -->
           <button class="action-btn" id="btn-open-wishlist" title="Favorites">
@@ -160,6 +166,10 @@ export function renderHeader(container, state) {
     openSearchModal(headerSearchInput.value);
   });
 
+  container.querySelector('#btn-mobile-search-trigger')?.addEventListener('click', () => {
+    openSearchModal('');
+  });
+
   container.querySelector('#btn-clear-header-search')?.addEventListener('click', (e) => {
     e.stopPropagation();
     headerSearchInput.value = '';
@@ -265,7 +275,6 @@ export function renderHeader(container, state) {
       </div>
     `;
 
-    // Click item preview to open product modal
     resultsContainer.querySelectorAll('.search-item-card').forEach(card => {
       card.addEventListener('click', () => {
         const prodId = card.dataset.id;
