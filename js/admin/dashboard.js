@@ -272,21 +272,22 @@ function renderAdminLoginScreen(container) {
           <p style="font-size: 0.82rem; color: var(--text-muted);">Enter admin authentication credentials to unlock dashboard</p>
         </div>
 
-        <form id="admin-login-form">
+        <form id="admin-login-form" autocomplete="off">
           <div class="form-group">
             <label class="form-label" style="color: var(--accent-gold); font-weight: 700;">Admin Username *</label>
-            <input type="text" name="username" required placeholder="e.g. kreid" class="form-input" style="padding: 0.8rem; font-size: 1rem; border-color: var(--border-gold);" value="kreid" />
+            <input type="text" name="username" required placeholder="Enter admin username" class="form-input" style="padding: 0.8rem; font-size: 1rem; border-color: var(--border-gold);" value="" autocomplete="off" />
           </div>
 
           <div class="form-group" style="margin-bottom: 1.8rem;">
             <label class="form-label" style="color: var(--accent-gold); font-weight: 700;">Admin Security Password *</label>
-            <input type="password" name="password" required placeholder="••••••••" class="form-input" style="padding: 0.8rem; font-size: 1rem; border-color: var(--border-gold);" value="kreid123@#" />
+            <input type="password" name="password" required placeholder="Enter admin password" class="form-input" style="padding: 0.8rem; font-size: 1rem; border-color: var(--border-gold);" value="" autocomplete="new-password" />
           </div>
 
           <button type="submit" class="btn btn-primary" style="width: 100%; padding: 1rem; font-size: 1rem; font-weight: 800;">
             🔒 Authenticate & Unlock Admin Dashboard
           </button>
         </form>
+
 
         <div style="margin-top: 1.5rem; text-align: center;">
           <button class="btn btn-secondary" id="btn-login-go-store" style="font-size: 0.82rem; padding: 0.5rem 1rem;">
