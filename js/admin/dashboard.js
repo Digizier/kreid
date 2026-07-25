@@ -921,6 +921,101 @@ function attachTableEventListeners(container, state) {
     });
   });
 
+  // Attach Print Dispatch Slip Modal Listener
+  container.querySelectorAll('.btn-print-slip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const orderId = btn.dataset.id;
+      const order = state.orders.find(o => o.id === orderId);
+      const modalRoot = container.querySelector('#admin-order-modal-root');
+      if (modalRoot && order) {
+        const itemsHTML = (order.items || []).map(item => `
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #333; color: #fff;">
+              <strong>${item.name}</strong><br/>
+              <span style="font-size: 0.78rem; color: var(--text-muted);">Size: ${item.selectedSize || 'N/A'}</span>
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #333; text-align: center; color: #fff;">${item.quantity}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #333; text-align: right; color: var(--accent-gold); font-weight: 700;">
+              PKR ${(item.price * item.quantity).toLocaleString()}
+            </td>
+          </tr>
+        `).join('');
+
+        modalRoot.classList.add('active');
+        modalRoot.innerHTML = `
+          <div class="modal-card" id="printable-slip-card" style="max-width: 680px; padding: 2.2rem; background: var(--bg-card); border: 2px solid var(--accent-gold); border-radius: var(--radius-md); max-height: 90vh; overflow-y: auto;">
+            <button class="modal-close-btn" id="btn-close-slip-modal">✕</button>
+
+            <!-- Printable Slip Content -->
+            <div id="slip-print-area">
+              <div style="text-align: center; border-bottom: 2px solid var(--border-gold); padding-bottom: 1rem; margin-bottom: 1.2rem;">
+                <h2 style="color: var(--accent-gold); font-size: 1.6rem; font-weight: 800; letter-spacing: 2px; margin-bottom: 0.2rem;">KREID COUTURE</h2>
+                <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase;">Official Courier Dispatch & Packing Slip</div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; background: var(--bg-secondary); border: 1px solid var(--border-light); padding: 1.2rem; border-radius: var(--radius-sm); margin-bottom: 1.2rem; font-size: 0.85rem;">
+                <div>
+                  <div style="color: var(--text-muted); font-size: 0.75rem;">ORDER DETAILS</div>
+                  <div><strong>Order ID:</strong> #${order.id}</div>
+                  <div><strong>Tracking Code:</strong> <span style="color: var(--accent-gold); font-weight: 800;">${order.trackingNo}</span></div>
+                  <div><strong>Order Date:</strong> ${order.date || new Date(order.timestamp).toLocaleString()}</div>
+                  <div><strong>Courier Partner:</strong> <strong style="color: var(--accent-gold);">${order.courier || 'Trax Logistics'}</strong></div>
+                </div>
+
+                <div>
+                  <div style="color: var(--text-muted); font-size: 0.75rem;">CONSIGNEE CUSTOMER DETAILS</div>
+                  <div><strong>Name:</strong> ${order.customerName}</div>
+                  <div><strong>Phone:</strong> ${order.phone}</div>
+                  <div><strong>City:</strong> <strong style="color: #fff;">${order.city}</strong></div>
+                  <div><strong>Address:</strong> ${order.address}</div>
+                </div>
+              </div>
+
+              <h4 style="color: var(--accent-gold); font-size: 0.95rem; margin-bottom: 0.6rem;">PACKING MANIFEST</h4>
+              <table width="100%" cellspacing="0" style="border-collapse: collapse; margin-bottom: 1.2rem; font-size: 0.85rem;">
+                <thead>
+                  <tr style="background: var(--bg-secondary); color: var(--accent-gold); text-transform: uppercase; font-size: 0.75rem;">
+                    <th style="padding: 8px; text-align: left;">Item Description</th>
+                    <th style="padding: 8px; text-align: center;">Qty</th>
+                    <th style="padding: 8px; text-align: right;">Total Price</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${itemsHTML}
+                </tbody>
+              </table>
+
+              <div style="background: rgba(212,175,55,0.1); border: 1px dashed var(--border-gold); padding: 1rem; border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <div>
+                  <div style="font-size: 0.8rem; color: var(--text-muted);">PAYMENT METHOD</div>
+                  <strong style="color: #fff; font-size: 1rem;">${order.paymentMethod}</strong>
+                </div>
+                <div style="text-align: right;">
+                  <div style="font-size: 0.8rem; color: var(--text-muted);">TOTAL PAYABLE AMOUNT</div>
+                  <strong style="color: var(--accent-gold); font-size: 1.4rem;">PKR ${order.total.toLocaleString()}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+              <button class="btn btn-secondary" id="btn-close-slip-footer">Close</button>
+              <button class="btn btn-primary" id="btn-do-print-slip" style="font-weight: 800;">
+                🖨️ Print Packing Slip
+              </button>
+            </div>
+          </div>
+        `;
+
+        modalRoot.querySelector('#btn-close-slip-modal')?.addEventListener('click', () => modalRoot.classList.remove('active'));
+        modalRoot.querySelector('#btn-close-slip-footer')?.addEventListener('click', () => modalRoot.classList.remove('active'));
+        modalRoot.querySelector('#btn-do-print-slip')?.addEventListener('click', () => {
+          window.print();
+        });
+      }
+    });
+  });
+
+
   container.querySelectorAll('.btn-delete-product').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = btn.dataset.id;

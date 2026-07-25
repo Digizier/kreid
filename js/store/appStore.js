@@ -585,18 +585,21 @@ class AppStore {
     return 0;
   }
 
-  getCartShippingFee() {
+  getCartShippingFee(city = 'Lahore') {
     const subtotal = this.getCartSubtotal();
     if (subtotal >= 5000 || (this.state.activeCoupon && this.state.activeCoupon.freeShipping)) {
       return 0;
     }
-    return 200;
+    const cartItemsCount = this.state.cart.reduce((sum, item) => sum + item.quantity, 0);
+    const shipping = this.calculateShippingFee(city, cartItemsCount);
+    return shipping.totalShippingFee;
   }
 
-  getCartTotal() {
+
+  getCartTotal(city = null) {
     const subtotal = this.getCartSubtotal();
     const discount = this.getCartDiscount();
-    const shipping = this.getCartShippingFee();
+    const shipping = this.getCartShippingFee(city);
     return Math.max(0, subtotal - discount + shipping);
   }
 
@@ -624,6 +627,9 @@ class AppStore {
     const trackingPrefix = orderData.courier.includes("TCS") ? "TCS" : orderData.courier.includes("Trax") ? "TRX" : "LPD";
     const trackingNo = trackingPrefix + "-" + Math.floor(1000000 + Math.random() * 9000000);
 
+    const shippingFee = this.getCartShippingFee(orderData.city);
+    const total = this.getCartTotal(orderData.city);
+
     const newOrder = {
       id: orderId,
       trackingNo,
@@ -631,8 +637,8 @@ class AppStore {
       items: [...this.state.cart],
       subtotal: this.getCartSubtotal(),
       discount: this.getCartDiscount(),
-      shippingFee: this.getCartShippingFee(),
-      total: this.getCartTotal(),
+      shippingFee: shippingFee,
+      total: total,
       status: "Processing",
       timestamp: Date.now(),
       date: new Date().toLocaleString('en-US', { hour12: false })
@@ -666,10 +672,11 @@ class AppStore {
     });
     this.saveStorage('kreid_wa_followups', this.state.whatsappFollowUps);
 
-    this.showToast(`Order #${newOrder.id} confirmed! Tracking: ${newOrder.trackingNo}`, 'success');
+    this.showToast(`🛍️ Order #${newOrder.id} Confirmed!`, 'success');
     this.notify();
     return newOrder;
   }
+
 
   // Admin Actions
   updateOrderStatus(orderId, newStatus) {

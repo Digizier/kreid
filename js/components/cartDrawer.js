@@ -94,19 +94,20 @@ export function renderCartDrawer(container, state) {
           ` : ''}
 
           <div style="display: flex; justify-content: space-between; color: var(--text-secondary);">
-            <span>Estimated Shipping:</span>
-            <span>${shipping === 0 ? '<strong style="color: var(--accent-green);">FREE</strong>' : `PKR ${shipping}`}</span>
+            <span>Shipping Fee:</span>
+            <span style="color: var(--accent-gold); font-size: 0.85rem;">Calculated at Checkout (City Based)</span>
           </div>
 
           <div style="display: flex; justify-content: space-between; font-size: 1.2rem; font-weight: 800; color: #ffffff; border-top: 1px solid var(--border-light); padding-top: 0.6rem; margin-top: 0.4rem;">
-            <span>Grand Total:</span>
-            <span style="color: var(--accent-gold);">PKR ${total.toLocaleString()}</span>
+            <span>Subtotal Total:</span>
+            <span style="color: var(--accent-gold);">PKR ${(subtotal - discount).toLocaleString()}</span>
           </div>
         </div>
 
         <button class="btn btn-primary" id="btn-cart-checkout" style="width: 100%;">
           ⚡ Proceed to Checkout
         </button>
+
       </div>
     ` : ''}
   `;

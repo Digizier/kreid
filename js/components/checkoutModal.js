@@ -268,12 +268,13 @@ export function renderCheckoutModal(container, state) {
       shippingBadge.textContent = `PKR ${shipping.totalShippingFee.toLocaleString()}`;
       shippingDesc.innerHTML = `Base Shipping (${selectedCity}): PKR ${shipping.baseFee} ${shipping.extraItems > 0 ? `<br/><span style="color: var(--accent-gold);">+ ${shipping.extraItems} Additional Products Fee: +PKR ${shipping.extraFee}</span>` : ''}`;
     }
-    const cartSubtotal = appStore.getCartTotal();
-    const finalTotal = cartSubtotal + shipping.totalShippingFee;
+    const finalTotal = appStore.getCartTotal(selectedCity);
     if (payableTotalElem) {
       payableTotalElem.textContent = `PKR ${finalTotal.toLocaleString()}`;
     }
   }
+
+
 
   citySelect?.addEventListener('change', (e) => {
     updateLiveShipping(e.target.value);
