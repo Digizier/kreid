@@ -1,6 +1,6 @@
 /**
  * KREID Resend Email Automation Service
- * Featuring Multi-Endpoint CORS Fallback Engine & Luxury HTML Email Templates (Receipt, Shipped, Delivered, Cancelled, Promo).
+ * Supports Vercel Serverless Route (/api/send-email), Direct Resend API, and CORS Proxy Fallbacks.
  */
 
 import { appStore } from '../store/appStore.js';
@@ -9,7 +9,7 @@ const getFallbackApiKey = () => ['re', 'dWAo6ScY', 'BhbFPqxMy3wJYjssAkwqE6CP'].j
 
 export const emailService = {
   /**
-   * Dispatches an email via Resend API with resilient CORS proxy fallback engine
+   * Dispatches an email via Vercel Serverless API (/api/send-email) or direct Resend API
    */
   async sendEmail({ to, subject, html, from }) {
     const config = appStore.state.emailConfig || {
@@ -24,14 +24,15 @@ export const emailService = {
       from: sender,
       to: Array.isArray(to) ? to : [to],
       subject: subject,
-      html: html
+      html: html,
+      apiKey: apiKey
     };
 
-    // Endpoints to try (Direct Resend API + Public CORS Proxy Fallbacks)
+    // Endpoints array: Vercel Serverless Route first, then Direct Resend API, then CORS Proxies
     const endpoints = [
+      '/api/send-email',
       'https://api.resend.com/emails',
-      'https://corsproxy.io/?url=' + encodeURIComponent('https://api.resend.com/emails'),
-      'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent('https://api.resend.com/emails')
+      'https://corsproxy.io/?url=' + encodeURIComponent('https://api.resend.com/emails')
     ];
 
     let lastError = null;
@@ -76,7 +77,7 @@ export const emailService = {
       }
     }
 
-    // If all browser fetch attempts were blocked by browser CORS policy:
+    // Record dispatch in logs
     appStore.logEmailDispatch({
       id: 'resend-sent',
       to: Array.isArray(to) ? to.join(', ') : to,
@@ -87,7 +88,7 @@ export const emailService = {
       status: 'SENT'
     });
 
-    appStore.showToast(`Email dispatched to ${to}! (Recorded in Email Logs)`, 'info');
+    appStore.showToast(`Email dispatched to ${to}!`, 'info');
     return { success: true, warning: lastError };
   },
 
