@@ -1,6 +1,6 @@
 /**
  * KREID WhatsApp Automation Suite Component
- * Dynamic Baileys QR Code Data URL rendering, Official 8-Digit Pairing Code Generator & Easypanel Gateway Integration.
+ * Direct Live Easypanel PNG QR Code Image Streaming & Official Baileys Pairing Code Integration.
  */
 
 import { appStore } from '../store/appStore.js';
@@ -12,11 +12,8 @@ export function renderWhatsAppManager(container, state) {
   const followUps = state.whatsappFollowUps || [];
   const logs = state.whatsappLogs || [];
 
-  const defaultEasypanelEndpoint = "https://localhost-kreid-whatsapp-auto-message.1k6q7u.easypanel.host/api/whatsapp/send";
-
-  // Check if live QR image data URL exists from server
-  const liveQrSrc = waSession.qrImageDataUrl || null;
-  const rawQrData = waSession.qrString || `2@EASYPANEL-KREID-WA-PAIRING-${Date.now()}`;
+  const serverBaseUrl = appStore.getServerBaseUrl();
+  const directQrImageUrl = `${serverBaseUrl}/api/qr.png?t=${Date.now()}`;
 
   container.innerHTML = `
     <div style="display: flex; flex-direction: column; gap: 2rem; max-width: 1100px;">
@@ -27,11 +24,11 @@ export function renderWhatsAppManager(container, state) {
           <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem;">
             <h3 style="font-size: 1.3rem;">📱 WhatsApp Web Device Connection</h3>
             <span class="badge ${waSession.status === 'CONNECTED' ? 'badge-green' : 'badge-red'}">
-              ${waSession.status === 'CONNECTED' ? '🟢 CONNECTED & ACTIVE (Easypanel Server)' : '🔴 DISCONNECTED (SCAN QR BELOW)'}
+              ${waSession.status === 'CONNECTED' ? '🟢 CONNECTED & ACTIVE' : '🔴 DISCONNECTED (SCAN QR BELOW)'}
             </span>
           </div>
           <p style="color: var(--text-muted); font-size: 0.88rem;">
-            Linked Phone: <strong style="color: var(--accent-gold);">${waSession.linkedNumber}</strong> | Host: <span style="color: #ffffff; font-family: monospace;">${appStore.getServerBaseUrl()}</span>
+            Linked Phone: <strong style="color: var(--accent-gold);">${waSession.linkedNumber}</strong> | Live Server: <span style="color: #ffffff; font-family: monospace;">${serverBaseUrl}</span>
           </p>
         </div>
 
@@ -45,7 +42,7 @@ export function renderWhatsAppManager(container, state) {
         </div>
       </div>
 
-      <!-- Scannable Official Baileys QR Code & 8-Digit Pairing Code Box -->
+      <!-- Direct Stream Live PNG QR Code & 8-Digit Pairing Code Box -->
       <div style="background: var(--bg-card); border: 1px dashed var(--accent-gold); padding: 2rem; border-radius: var(--radius-md); text-align: center;">
         <h4 style="color: var(--accent-gold); margin-bottom: 0.5rem; font-size: 1.15rem;">📷 Scan Live QR Code or Enter 8-Digit Pairing Code</h4>
         <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.5rem;">
@@ -53,12 +50,9 @@ export function renderWhatsAppManager(container, state) {
         </p>
 
         <div style="display: flex; justify-content: center; align-items: center; gap: 2.5rem; flex-wrap: wrap;">
-          <!-- Baileys Official QR Code Tile -->
+          <!-- Direct Stream PNG QR Code from Easypanel Server -->
           <div style="background: #ffffff; padding: 1.2rem; border-radius: var(--radius-md); box-shadow: 0 8px 30px rgba(0,0,0,0.5); border: 3px solid var(--accent-gold); display: inline-block;">
-            ${liveQrSrc 
-              ? `<img src="${liveQrSrc}" alt="Official Baileys QR Code" style="width: 200px; height: 200px; display: block;" />`
-              : generateNativeSVGQRCode(rawQrData)
-            }
+            <img id="easypanel-qr-image-elem" src="${directQrImageUrl}" alt="Live Easypanel WhatsApp QR Code" style="width: 200px; height: 200px; display: block; border-radius: 4px;" />
             <div style="font-size: 0.75rem; color: #000000; font-weight: 800; margin-top: 0.6rem; letter-spacing: 0.05em;">SCAN WITH WHATSAPP CAMERA</div>
           </div>
 
@@ -76,7 +70,7 @@ export function renderWhatsAppManager(container, state) {
               </button>
             </div>
             <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.8rem; word-break: break-all;">
-              ℹ️ Live Easypanel Host: <code style="color: var(--accent-gold);">${waConfig.primaryEndpoint || defaultEasypanelEndpoint}</code>
+              ℹ️ Live Stream URL: <code style="color: var(--accent-gold);">${directQrImageUrl}</code>
             </div>
           </div>
         </div>
@@ -109,7 +103,7 @@ export function renderWhatsAppManager(container, state) {
 
             <div class="form-group" style="margin-bottom: 0;">
               <label class="form-label">API Endpoint / Host URL (Your Easypanel URL)</label>
-              <input type="text" name="primaryEndpoint" class="form-input" value="${waConfig.primaryEndpoint || defaultEasypanelEndpoint}" required style="font-family: monospace; color: var(--accent-gold);" />
+              <input type="text" name="primaryEndpoint" class="form-input" value="${waConfig.primaryEndpoint || 'https://localhost-kreid-whatsapp-auto-message.1k6q7u.easypanel.host/api/whatsapp/send'}" required style="font-family: monospace; color: var(--accent-gold);" />
             </div>
           </div>
 
@@ -265,7 +259,11 @@ export function renderWhatsAppManager(container, state) {
   });
 
   container.querySelector('#btn-refresh-qr')?.addEventListener('click', async () => {
-    await appStore.fetchLiveQR();
+    const imgElem = container.querySelector('#easypanel-qr-image-elem');
+    if (imgElem) {
+      imgElem.src = `${serverBaseUrl}/api/qr.png?t=${Date.now()}`;
+    }
+    await appStore.refreshLiveQR();
     renderWhatsAppManager(container, appStore.state);
   });
 
@@ -318,54 +316,4 @@ export function renderWhatsAppManager(container, state) {
     appStore.saveStorage('kreid_wa_templates', state.whatsappTemplates);
     appStore.showToast('WhatsApp templates updated!', 'success');
   });
-}
-
-/**
- * Pure Native High-Contrast SVG QR Code Matrix Generator
- * Renders a crisp 25x25 QR Matrix directly in client SVG.
- */
-function generateNativeSVGQRCode(dataStr) {
-  const matrixSize = 25;
-  const cellSize = 8;
-  const totalSize = matrixSize * cellSize; // 200px
-
-  let hash = 0;
-  for (let i = 0; i < dataStr.length; i++) {
-    hash = ((hash << 5) - hash) + dataStr.charCodeAt(i);
-    hash |= 0;
-  }
-
-  let rects = '';
-
-  for (let row = 0; row < matrixSize; row++) {
-    for (let col = 0; col < matrixSize; col++) {
-      const isTopLeftFinder = (row < 7 && col < 7);
-      const isTopRightFinder = (row < 7 && col >= matrixSize - 7);
-      const isBottomLeftFinder = (row >= matrixSize - 7 && col < 7);
-
-      if (isTopLeftFinder || isTopRightFinder || isBottomLeftFinder) {
-        const r = isTopLeftFinder ? row : isTopRightFinder ? row : row - (matrixSize - 7);
-        const c = isTopLeftFinder ? col : isTopRightFinder ? col - (matrixSize - 7) : col;
-
-        const isOuterBorder = (r === 0 || r === 6 || c === 0 || c === 6);
-        const isInnerCore = (r >= 2 && r <= 4 && c >= 2 && c <= 4);
-
-        if (isOuterBorder || isInnerCore) {
-          rects += `<rect x="${col * cellSize}" y="${row * cellSize}" width="${cellSize}" height="${cellSize}" fill="#000000" />`;
-        }
-      } else {
-        const seed = (row * 37 + col * 17 + hash) % 100;
-        if (Math.abs(seed) % 2 === 0) {
-          rects += `<rect x="${col * cellSize}" y="${row * cellSize}" width="${cellSize}" height="${cellSize}" fill="#000000" />`;
-        }
-      }
-    }
-  }
-
-  return `
-    <svg width="${totalSize}" height="${totalSize}" viewBox="0 0 ${totalSize} ${totalSize}" xmlns="http://www.w3.org/2000/svg" style="display: block;">
-      <rect width="${totalSize}" height="${totalSize}" fill="#ffffff" />
-      ${rects}
-    </svg>
-  `;
 }
