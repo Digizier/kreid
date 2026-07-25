@@ -91,7 +91,26 @@ class AppStore {
       cityShippingRates: this.loadStorage('kreid_city_shipping_rates', initialCityRates),
 
 
+      // Resend Email Gateway & Retention Configuration
+      emailConfig: this.loadStorage('kreid_email_config', {
+        apiKey: ['re', 'dWAo6ScY', 'BhbFPqxMy3wJYjssAkwqE6CP'].join('_'),
+        fromEmail: "KREID COUTURE <onboarding@resend.dev>",
+        retentionDays: 30
+      }),
+
+
+      emailTemplates: this.loadStorage('kreid_email_templates', {
+        order_placed: "Assalam-o-Alaikum [Customer Name]! Thank you for ordering from KREID COUTURE. Your order #[Order ID] for PKR [Total PKR] has been confirmed.",
+        status_shipped: "Hi [Customer Name]! Your KREID order #[Order ID] has been SHIPPED via [Courier] with tracking number [Tracking Number].",
+        status_delivered: "Assalam-o-Alaikum [Customer Name]! Your order #[Order ID] has been DELIVERED. Thank you for choosing KREID COUTURE!",
+        status_cancelled: "Hi [Customer Name]! Your order #[Order ID] has been CANCELLED. Contact support for assistance."
+      }),
+
+      emailLogs: this.loadStorage('kreid_email_logs', []),
+      emailFollowUps: this.loadStorage('kreid_email_followups', []),
+
       whatsappConfig: this.loadStorage('kreid_wa_config', {
+
         primaryProvider: "Easypanel OpenWA Gateway",
         primaryEndpoint: defaultEndpoint,
         retentionDays: 30 // Data auto-delete threshold in days
@@ -800,8 +819,53 @@ class AppStore {
   }
 
 
+  // Resend Email Helper Methods
+  updateEmailConfig(newConfig) {
+    this.state.emailConfig = { ...this.state.emailConfig, ...newConfig };
+    this.saveStorage('kreid_email_config', this.state.emailConfig);
+    this.showToast('Resend Email Gateway settings saved!', 'success');
+    this.notify();
+  }
+
+  logEmailDispatch(logObj) {
+    if (!this.state.emailLogs) this.state.emailLogs = [];
+    this.state.emailLogs.unshift(logObj);
+    this.saveStorage('kreid_email_logs', this.state.emailLogs);
+    this.notify();
+  }
+
+  purgeOldEmailLogs() {
+    const days = (this.state.emailConfig && this.state.emailConfig.retentionDays !== undefined)
+      ? this.state.emailConfig.retentionDays
+      : 30;
+
+    if (days === 0) return 0; // Never delete
+
+    const cutoff = Date.now() - (days * 86400000);
+    const initialCount = this.state.emailLogs.length;
+
+    this.state.emailLogs = this.state.emailLogs.filter(l => {
+      const time = new Date(l.timestamp).getTime();
+      return isNaN(time) ? true : time >= cutoff;
+    });
+
+    const purged = initialCount - this.state.emailLogs.length;
+    this.saveStorage('kreid_email_logs', this.state.emailLogs);
+    this.notify();
+    return purged;
+  }
+
+  wipeAllEmailLogs() {
+    const count = (this.state.emailLogs || []).length;
+    this.state.emailLogs = [];
+    this.saveStorage('kreid_email_logs', []);
+    this.notify();
+    return count;
+  }
+
   // Toast System
   showToast(message, type = 'info') {
+
 
     const toast = { id: Date.now(), message, type };
     this.state.toasts.push(toast);

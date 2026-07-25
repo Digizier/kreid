@@ -5,8 +5,10 @@
 
 import { appStore } from '../store/appStore.js';
 import { majorMetroCities, allPakistanCities } from '../data/pakistanCities.js';
+import { emailService } from '../services/emailService.js';
 
 let paymentProofBase64 = null;
+
 
 let confirmedOrderData = null;
 
@@ -354,9 +356,15 @@ export function renderCheckoutModal(container, state) {
 
     confirmedOrderData = appStore.createOrder(orderDetails);
     paymentProofBase64 = null;
+
+    if (confirmedOrderData && confirmedOrderData.email) {
+      emailService.sendOrderReceiptEmail(confirmedOrderData);
+    }
+
     renderCheckoutModal(container, appStore.state);
   });
 }
+
 
 /**
  * Local Order Confirmation Receipt UI Component

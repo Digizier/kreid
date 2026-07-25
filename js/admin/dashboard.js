@@ -5,9 +5,12 @@
 
 import { appStore } from '../store/appStore.js';
 import { renderWhatsAppManager } from './whatsappManager.js';
+import { renderEmailManager } from './emailManager.js';
+import { emailService } from '../services/emailService.js';
 import { majorMetroCities, allPakistanCities } from '../data/pakistanCities.js';
 
-let activeTab = 'dashboard'; // 'dashboard' | 'products' | 'orders' | 'whatsapp' | 'coupons' | 'cityrates' | 'settings'
+let activeTab = 'dashboard'; // 'dashboard' | 'products' | 'orders' | 'whatsapp' | 'email' | 'coupons' | 'cityrates' | 'settings'
+
 let editingProduct = null;
 let uploadedImages = [];
 
@@ -51,6 +54,10 @@ export function renderAdminDashboard(container, state) {
           <div class="menu-item ${activeTab === 'whatsapp' ? 'active' : ''}" data-tab="whatsapp">
             📱 WhatsApp Automation
           </div>
+          <div class="menu-item ${activeTab === 'email' ? 'active' : ''}" data-tab="email">
+            📧 Email Automation
+          </div>
+
           <div class="menu-item ${activeTab === 'coupons' ? 'active' : ''}" data-tab="coupons">
             🎟️ Discount Coupons (${state.coupons.length})
           </div>
@@ -80,6 +87,7 @@ export function renderAdminDashboard(container, state) {
                 activeTab === 'orders' ? 'Order Fulfillment & Payment Proof Inspector' :
                 activeTab === 'cityrates' ? '127+ Pakistani Cities Custom Shipping Rates' :
                 activeTab === 'whatsapp' ? 'WhatsApp Automation & Dual-Gateway Suite' :
+                activeTab === 'email' ? 'Resend Email Automation & Dispatcher Suite' :
                 activeTab === 'coupons' ? 'Promotions & Coupons Engine' : 'Payment Accounts Settings'}
             </h1>
             <p style="color: var(--text-muted); font-size: 0.85rem;">
@@ -109,7 +117,10 @@ export function renderAdminDashboard(container, state) {
         <!-- Dynamic Tab Content -->
         ${activeTab === 'whatsapp' 
           ? '<div id="whatsapp-tab-container"></div>'
+          : activeTab === 'email'
+          ? '<div id="email-tab-container"></div>'
           : renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowStockCount)}
+
 
       </main>
     </div>
@@ -126,6 +137,12 @@ export function renderAdminDashboard(container, state) {
     const waContainer = container.querySelector('#whatsapp-tab-container');
     if (waContainer) renderWhatsAppManager(waContainer, state);
   }
+
+  if (activeTab === 'email') {
+    const emailContainer = container.querySelector('#email-tab-container');
+    if (emailContainer) renderEmailManager(emailContainer, state);
+  }
+
 
   // Attach Sidebar Listeners
   const menuItems = container.querySelectorAll('.menu-item');
