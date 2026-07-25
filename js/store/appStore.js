@@ -75,10 +75,11 @@ class AppStore {
         sadapay: { title: "KREID COUTURE SADA", number: "0333 4455667" },
         bank: { bankName: "Bank Alfalah Limited", title: "KREID COUTURE SMC PVT LTD", iban: "PK45 BAHL 0001 2345 6789 0123" }
       }),
-      // Live WhatsApp Configuration
+      // Live WhatsApp Configuration & Retention
       whatsappConfig: this.loadStorage('kreid_wa_config', {
         primaryProvider: "Easypanel OpenWA Gateway",
-        primaryEndpoint: defaultEndpoint
+        primaryEndpoint: defaultEndpoint,
+        retentionDays: 30 // Data auto-delete threshold in days
       }),
       whatsappSession: this.loadStorage('kreid_wa_session', {
         status: "DISCONNECTED",
@@ -90,7 +91,8 @@ class AppStore {
       whatsappTemplates: this.loadStorage('kreid_wa_templates', {
         order_placed: "Assalam-o-Alaikum [Customer Name]! Thank you for your order #[Order ID] at KREID COUTURE. Total: PKR [Total PKR]. Courier: [Courier]. Tracking #: [Tracking Number]. Our team will verify and dispatch your order shortly!",
         status_shipped: "Hi [Customer Name]! Great news! Your KREID order #[Order ID] has been SHIPPED via [Courier]. Tracking #: [Tracking Number]. Track live at KREID portal!",
-        status_delivered: "Assalam-o-Alaikum [Customer Name]! Your KREID order #[Order ID] has been DELIVERED. Thank you for choosing KREID COUTURE! We hope you love your outfit."
+        status_delivered: "Assalam-o-Alaikum [Customer Name]! Your KREID order #[Order ID] has been DELIVERED. Thank you for choosing KREID COUTURE! We hope you love your outfit.",
+        status_cancelled: "Assalam-o-Alaikum [Customer Name]! Your KREID order #[Order ID] has been CANCELLED. If you have any questions or would like to re-order, please contact our support team at +92 300 1234567."
       }),
       whatsappFollowUps: this.loadStorage('kreid_wa_followups', [
         {
@@ -98,7 +100,8 @@ class AppStore {
           customerName: "Zain Ali",
           phone: "+92 300 9876543",
           sendTime: "Today at 18:30 (In 2 Hours)",
-          status: "SCHEDULED"
+          status: "SCHEDULED",
+          createdAt: Date.now() - 3600000 * 2
         }
       ]),
       whatsappLogs: this.loadStorage('kreid_wa_logs', [
@@ -106,13 +109,15 @@ class AppStore {
           phone: "+92 300 9876543",
           event: "ORDER_PLACED",
           gateway: "Easypanel Gateway",
-          timestamp: "2026-07-25 15:30"
+          timestamp: "2026-07-25 15:30",
+          createdAt: Date.now() - 3600000 * 3
         },
         {
           phone: "+92 321 4567890",
           event: "STATUS_SHIPPED",
           gateway: "Easypanel Gateway",
-          timestamp: "2026-07-25 12:15"
+          timestamp: "2026-07-25 12:15",
+          createdAt: Date.now() - 3600000 * 6
         }
       ]),
       activeCoupon: null,
@@ -127,8 +132,9 @@ class AppStore {
       toasts: []
     };
 
-    // Auto check live Easypanel server status on init
+    // Auto check live status & purge old data based on retention settings
     this.checkLiveWhatsAppStatus();
+    this.purgeOldWhatsAppLogs();
   }
 
   // Helper storage loader
@@ -208,6 +214,36 @@ class AppStore {
     this.notify();
   }
 
+  // Auto Purge Data Retention Engine for WhatsApp Logs & Follow-Ups
+  purgeOldWhatsAppLogs(manualDays = null) {
+    const days = manualDays || this.state.whatsappConfig.retentionDays || 30;
+    if (days === 0) return 0; // 0 means Never auto-delete
+
+    const cutoffTimestamp = Date.now() - (days * 86400000);
+    const initialLogsCount = this.state.whatsappLogs.length;
+    const initialFollowUpsCount = this.state.whatsappFollowUps.length;
+
+    this.state.whatsappLogs = this.state.whatsappLogs.filter(log => {
+      const logTime = log.createdAt || (new Date(log.timestamp).getTime());
+      return logTime ? logTime >= cutoffTimestamp : true;
+    });
+
+    this.state.whatsappFollowUps = this.state.whatsappFollowUps.filter(item => {
+      const itemTime = item.createdAt || Date.now();
+      return itemTime >= cutoffTimestamp;
+    });
+
+    const purgedCount = (initialLogsCount - this.state.whatsappLogs.length) + (initialFollowUpsCount - this.state.whatsappFollowUps.length);
+
+    this.saveStorage('kreid_wa_logs', this.state.whatsappLogs);
+    this.saveStorage('kreid_wa_followups', this.state.whatsappFollowUps);
+    
+    if (purgedCount > 0) {
+      console.log(`🧹 Auto-purged ${purgedCount} old WhatsApp log records (> ${days} days old)`);
+    }
+    return purgedCount;
+  }
+
   // Helper to extract server base origin URL from API endpoint
   getServerBaseUrl() {
     const endpoint = this.state.whatsappConfig.primaryEndpoint || 'https://localhost-kreid-whatsapp-auto-message.1k6q7u.easypanel.host/api/whatsapp/send';
@@ -279,7 +315,6 @@ class AppStore {
       console.warn("QR Refresh error:", err.message);
     }
 
-    // Force client QR update
     this.state.whatsappSession.qrString = `2@EASYPANEL-BAILEYS-${Date.now()}`;
     this.notify();
     return null;
@@ -343,11 +378,15 @@ class AppStore {
       phone,
       event: eventType.toUpperCase(),
       gateway: gatewayUsed,
-      timestamp: new Date().toLocaleString('en-US', { hour12: false })
+      timestamp: new Date().toLocaleString('en-US', { hour12: false }),
+      createdAt: Date.now()
     };
 
     this.state.whatsappLogs.unshift(logItem);
     this.saveStorage('kreid_wa_logs', this.state.whatsappLogs);
+
+    // Auto purge old logs during write
+    this.purgeOldWhatsAppLogs();
 
     this.showToast(`💬 WhatsApp message dispatched via Easypanel Server to ${phone}!`, 'success');
     this.notify();
@@ -364,7 +403,8 @@ class AppStore {
     this.state.whatsappConfig = { ...this.state.whatsappConfig, ...newConfig };
     this.saveStorage('kreid_wa_config', this.state.whatsappConfig);
     this.checkLiveWhatsAppStatus();
-    this.showToast('Primary WhatsApp Gateway Settings Saved!', 'success');
+    this.purgeOldWhatsAppLogs();
+    this.showToast('Primary WhatsApp Gateway & Retention Settings Saved!', 'success');
     this.notify();
   }
 
@@ -536,7 +576,8 @@ class AppStore {
       customerName: newOrder.customerName,
       phone: newOrder.phone,
       sendTime: "In 2 Hours (" + new Date(Date.now() + 7200000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ")",
-      status: "SCHEDULED"
+      status: "SCHEDULED",
+      createdAt: Date.now()
     });
     this.saveStorage('kreid_wa_followups', this.state.whatsappFollowUps);
 
@@ -552,7 +593,7 @@ class AppStore {
       order.status = newStatus;
       this.saveStorage('kreid_orders', this.state.orders);
       
-      // Trigger WhatsApp status notification
+      // Trigger WhatsApp status notification (including 'status_cancelled')
       const eventKey = 'status_' + newStatus.toLowerCase();
       this.sendWhatsAppNotification(eventKey, order);
 

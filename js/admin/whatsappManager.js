@@ -1,6 +1,6 @@
 /**
  * KREID WhatsApp Automation Suite Component
- * Direct Live Easypanel PNG QR Code Image Streaming & Official Baileys Pairing Code Integration.
+ * Direct Live Easypanel PNG QR Code Image Streaming, Cancellation Templates & Configurable Auto-Purge Retention Engine.
  */
 
 import { appStore } from '../store/appStore.js';
@@ -76,21 +76,26 @@ export function renderWhatsAppManager(container, state) {
         </div>
       </div>
 
-      <!-- Section 2: Primary WhatsApp Gateway Configuration -->
+      <!-- Section 2: Primary WhatsApp Gateway & Data Retention Control -->
       <div style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 1.8rem; border-radius: var(--radius-md);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
           <div>
-            <h3 style="font-size: 1.2rem; color: var(--accent-gold);">⚡ Primary WhatsApp Gateway Config</h3>
-            <p style="font-size: 0.82rem; color: var(--text-muted);">Direct Easypanel WhatsApp Gateway for storefront automated order notifications.</p>
+            <h3 style="font-size: 1.2rem; color: var(--accent-gold);">⚡ Primary Gateway & Data Retention Settings</h3>
+            <p style="font-size: 0.82rem; color: var(--text-muted);">Configure live Easypanel endpoint and automatic log/queue data deletion rules.</p>
           </div>
-          <button class="btn btn-secondary" id="btn-wa-send-test" style="font-size: 0.8rem; padding: 0.5rem 1rem;">
-            ✉️ Send Test Message
-          </button>
+          <div style="display: flex; gap: 0.6rem;">
+            <button class="btn btn-secondary" id="btn-wa-purge-now" style="font-size: 0.8rem; padding: 0.5rem 0.9rem;">
+              🧹 Purge Old Records Now
+            </button>
+            <button class="btn btn-secondary" id="btn-wa-send-test" style="font-size: 0.8rem; padding: 0.5rem 0.9rem;">
+              ✉️ Send Test Message
+            </button>
+          </div>
         </div>
 
         <form id="wa-gateway-form">
           <div style="background: var(--bg-secondary); padding: 1.4rem; border-radius: var(--radius-sm); border: 1px solid var(--border-gold); margin-bottom: 1rem;">
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
               <div class="form-group">
                 <label class="form-label">Gateway Provider / Name</label>
                 <input type="text" name="primaryProvider" class="form-input" value="${waConfig.primaryProvider || 'Easypanel OpenWA Gateway'}" />
@@ -98,6 +103,17 @@ export function renderWhatsAppManager(container, state) {
               <div class="form-group">
                 <label class="form-label">Linked Admin Phone Number</label>
                 <input type="text" name="linkedNumber" class="form-input" value="${waSession.linkedNumber || '+92 300 1234567'}" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Auto-Delete History & Queue Data</label>
+                <select name="retentionDays" class="form-select">
+                  <option value="7" ${waConfig.retentionDays == 7 ? 'selected' : ''}>Auto-Delete older than 7 Days</option>
+                  <option value="14" ${waConfig.retentionDays == 14 ? 'selected' : ''}>Auto-Delete older than 14 Days</option>
+                  <option value="30" ${waConfig.retentionDays == 30 || !waConfig.retentionDays ? 'selected' : ''}>Auto-Delete older than 30 Days (Recommended)</option>
+                  <option value="60" ${waConfig.retentionDays == 60 ? 'selected' : ''}>Auto-Delete older than 60 Days</option>
+                  <option value="90" ${waConfig.retentionDays == 90 ? 'selected' : ''}>Auto-Delete older than 90 Days</option>
+                  <option value="0" ${waConfig.retentionDays == 0 ? 'selected' : ''}>Keep Forever (Never Delete)</option>
+                </select>
               </div>
             </div>
 
@@ -108,12 +124,12 @@ export function renderWhatsAppManager(container, state) {
           </div>
 
           <button type="submit" class="btn btn-primary">
-            💾 Save Primary WhatsApp Gateway Settings
+            💾 Save Primary WhatsApp Gateway & Retention Settings
           </button>
         </form>
       </div>
 
-      <!-- Section 3: Event Notification Templates -->
+      <!-- Section 3: Event Notification Templates (Including Cancelled Template) -->
       <div style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 1.8rem; border-radius: var(--radius-md);">
         <h3 style="font-size: 1.2rem; color: var(--accent-gold); margin-bottom: 0.5rem;">📝 Automated Order Event WhatsApp Templates</h3>
         <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1.2rem;">
@@ -136,6 +152,11 @@ export function renderWhatsAppManager(container, state) {
               <label class="form-label">3. Status: Delivered Template (Sent upon delivery completion)</label>
               <textarea name="tplDelivered" class="form-input" rows="2">${templates.status_delivered}</textarea>
             </div>
+
+            <div class="form-group">
+              <label class="form-label" style="color: #ff6b6b;">4. Status: Cancelled Template (Sent upon order cancellation)</label>
+              <textarea name="tplCancelled" class="form-input" rows="2" style="border-color: rgba(255, 107, 107, 0.4);">${templates.status_cancelled || 'Assalam-o-Alaikum [Customer Name]! Your KREID order #[Order ID] has been CANCELLED. If you have any questions or would like to re-order, please contact our support team at +92 300 1234567.'}</textarea>
+            </div>
           </div>
 
           <button type="submit" class="btn btn-primary" style="margin-top: 1rem;">
@@ -144,11 +165,14 @@ export function renderWhatsAppManager(container, state) {
         </form>
       </div>
 
-      <!-- Section 4: Scheduled Automated Follow-Up Engine -->
+      <!-- Section 4: Scheduled Automated Follow-Up Message Automation -->
       <div style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 1.8rem; border-radius: var(--radius-md);">
-        <h3 style="font-size: 1.2rem; color: var(--accent-gold); margin-bottom: 0.5rem;">⏰ Scheduled Customer Follow-Up Message Automation</h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <h3 style="font-size: 1.2rem; color: var(--accent-gold);">⏰ Scheduled Customer Follow-Up Message Automation</h3>
+          <span style="font-size: 0.8rem; color: var(--text-muted);">Auto-purge threshold: <strong style="color: var(--accent-gold);">${waConfig.retentionDays ? waConfig.retentionDays + ' Days' : '30 Days'}</strong></span>
+        </div>
         <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1.5rem;">
-          Automatically dispatches a follow-up WhatsApp message after order placement/delivery to boost customer satisfaction & repeat sales.
+          Automatically dispatches a follow-up WhatsApp message after order placement/delivery. Records older than configured retention period are automatically purged.
         </p>
 
         <div style="background: var(--bg-secondary); padding: 1.2rem; border-radius: var(--radius-sm); border: 1px solid var(--border-light); margin-bottom: 1.5rem;">
@@ -207,8 +231,11 @@ export function renderWhatsAppManager(container, state) {
 
       <!-- Section 5: Real-Time WhatsApp Dispatch Logs -->
       <div style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 1.8rem; border-radius: var(--radius-md);">
-        <h3 style="font-size: 1.2rem; color: var(--accent-gold); margin-bottom: 1rem;">📜 Dispatched WhatsApp Notifications History</h3>
-        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+          <h3 style="font-size: 1.2rem; color: var(--accent-gold);">📜 Dispatched WhatsApp Notifications History</h3>
+          <span style="font-size: 0.8rem; color: var(--text-muted);">Auto-purge threshold: <strong style="color: var(--accent-gold);">${waConfig.retentionDays ? waConfig.retentionDays + ' Days' : '30 Days'}</strong></span>
+        </div>
+
         <div class="admin-table-wrap" style="margin-bottom: 0;">
           <table class="admin-table">
             <thead>
@@ -230,7 +257,7 @@ export function renderWhatsAppManager(container, state) {
               ` : logs.map(l => `
                 <tr>
                   <td><strong>${l.phone}</strong></td>
-                  <td><span class="badge badge-gold">${l.event}</span></td>
+                  <td><span class="badge ${l.event.includes('CANCEL') ? 'badge-red' : 'badge-gold'}">${l.event}</span></td>
                   <td>${l.gateway}</td>
                   <td>${l.timestamp}</td>
                   <td><span class="badge badge-green">DELIVERED</span></td>
@@ -272,6 +299,12 @@ export function renderWhatsAppManager(container, state) {
     appStore.showToast('Pairing Code copied to clipboard!', 'info');
   });
 
+  container.querySelector('#btn-wa-purge-now')?.addEventListener('click', () => {
+    const count = appStore.purgeOldWhatsAppLogs();
+    appStore.showToast(`Purged ${count} records older than configured retention period!`, 'info');
+    renderWhatsAppManager(container, appStore.state);
+  });
+
   container.querySelector('#btn-wa-send-test')?.addEventListener('click', () => {
     const phone = prompt("Enter Pakistani phone number for WhatsApp test message (+92 3XX XXXXXXX):", "+92 300 9876543");
     if (phone) {
@@ -300,7 +333,8 @@ export function renderWhatsAppManager(container, state) {
 
     appStore.updateWhatsAppConfig({
       primaryProvider: fd.get('primaryProvider'),
-      primaryEndpoint: fd.get('primaryEndpoint')
+      primaryEndpoint: fd.get('primaryEndpoint'),
+      retentionDays: parseInt(fd.get('retentionDays'))
     });
     renderWhatsAppManager(container, appStore.state);
   });
@@ -313,7 +347,8 @@ export function renderWhatsAppManager(container, state) {
     state.whatsappTemplates.order_placed = fd.get('tplOrderPlaced');
     state.whatsappTemplates.status_shipped = fd.get('tplShipped');
     state.whatsappTemplates.status_delivered = fd.get('tplDelivered');
+    state.whatsappTemplates.status_cancelled = fd.get('tplCancelled');
     appStore.saveStorage('kreid_wa_templates', state.whatsappTemplates);
-    appStore.showToast('WhatsApp templates updated!', 'success');
+    appStore.showToast('WhatsApp templates (including Order Cancellation) updated!', 'success');
   });
 }
