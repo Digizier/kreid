@@ -72,12 +72,10 @@ class AppStore {
         sadapay: { title: "KREID COUTURE SADA", number: "0333 4455667" },
         bank: { bankName: "Bank Alfalah Limited", title: "KREID COUTURE SMC PVT LTD", iban: "PK45 BAHL 0001 2345 6789 0123" }
       }),
-      // WhatsApp Automation State
+      // Streamlined Primary WhatsApp Gateway State
       whatsappConfig: this.loadStorage('kreid_wa_config', {
-        primaryProvider: "OpenWA / Baileys Web Engine",
-        primaryEndpoint: "http://localhost:3000/api/whatsapp/send",
-        fallbackProvider: "Twilio / Meta WhatsApp API",
-        fallbackApiKey: "TW-LIVE-PK-98241092"
+        primaryProvider: "OpenWA / Baileys Engine",
+        primaryEndpoint: "http://localhost:3000/api/whatsapp/send"
       }),
       whatsappSession: this.loadStorage('kreid_wa_session', {
         status: "CONNECTED",
@@ -102,13 +100,13 @@ class AppStore {
         {
           phone: "+92 300 9876543",
           event: "ORDER_PLACED",
-          gateway: "Primary (OpenWA)",
+          gateway: "Primary (OpenWA Engine)",
           timestamp: "2026-07-25 15:30"
         },
         {
           phone: "+92 321 4567890",
           event: "STATUS_SHIPPED",
-          gateway: "Primary (OpenWA)",
+          gateway: "Primary (OpenWA Engine)",
           timestamp: "2026-07-25 12:15"
         }
       ]),
@@ -202,7 +200,7 @@ class AppStore {
     this.notify();
   }
 
-  // WhatsApp Messaging Actions with Dual-Gateway Failover
+  // Primary WhatsApp Gateway Actions
   sendWhatsAppNotification(eventType, orderData) {
     const phone = orderData.phone || "+92 300 1234567";
     const templates = this.state.whatsappTemplates;
@@ -216,11 +214,7 @@ class AppStore {
       .replace(/\[Courier\]/g, orderData.courier || 'Trax Logistics')
       .replace(/\[Tracking Number\]/g, orderData.trackingNo || 'TRX-101');
 
-    // Failover Simulation
-    const primaryConnected = this.state.whatsappSession.status === 'CONNECTED';
-    const gatewayUsed = primaryConnected 
-      ? `Primary (${this.state.whatsappConfig.primaryProvider})`
-      : `Fallback (${this.state.whatsappConfig.fallbackProvider})`;
+    const gatewayUsed = `Primary (${this.state.whatsappConfig.primaryProvider})`;
 
     const logItem = {
       phone,
@@ -232,7 +226,7 @@ class AppStore {
     this.state.whatsappLogs.unshift(logItem);
     this.saveStorage('kreid_wa_logs', this.state.whatsappLogs);
 
-    this.showToast(`💬 WhatsApp message sent to ${phone} via ${gatewayUsed}`, 'success');
+    this.showToast(`💬 WhatsApp notification sent to ${phone}!`, 'success');
     this.notify();
   }
 
@@ -246,7 +240,7 @@ class AppStore {
   updateWhatsAppConfig(newConfig) {
     this.state.whatsappConfig = { ...this.state.whatsappConfig, ...newConfig };
     this.saveStorage('kreid_wa_config', this.state.whatsappConfig);
-    this.showToast('WhatsApp Dual-Gateway Settings Saved!', 'success');
+    this.showToast('Primary WhatsApp Gateway Settings Saved!', 'success');
     this.notify();
   }
 
@@ -409,7 +403,7 @@ class AppStore {
     this.saveStorage('kreid_products', this.state.products);
     this.clearCart();
 
-    // Trigger Automated WhatsApp Notification
+    // Trigger Automated WhatsApp Notification via Primary Gateway
     this.sendWhatsAppNotification('order_placed', newOrder);
 
     // Schedule 2-Hour Follow Up Message

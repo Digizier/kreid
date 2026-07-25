@@ -1,6 +1,6 @@
 /**
- * KREID WhatsApp Automation & Dual-Gateway Suite Component
- * Handles QR pairing connection, dual-provider failover config, automated event templates, follow-up queue, and notification logs.
+ * KREID WhatsApp Automation Suite Component
+ * Handles QR pairing connection, primary OpenWA gateway config, automated event templates, follow-up queue, and notification logs.
  */
 
 import { appStore } from '../store/appStore.js';
@@ -21,17 +21,17 @@ export function renderWhatsAppManager(container, state) {
           <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem;">
             <h3 style="font-size: 1.3rem;">📱 WhatsApp Web Device Connection</h3>
             <span class="badge ${waSession.status === 'CONNECTED' ? 'badge-green' : 'badge-red'}">
-              ${waSession.status === 'CONNECTED' ? '🟢 CONNECTED' : '🔴 DISCONNECTED'}
+              ${waSession.status === 'CONNECTED' ? '🟢 CONNECTED & ACTIVE' : '🔴 DISCONNECTED'}
             </span>
           </div>
           <p style="color: var(--text-muted); font-size: 0.88rem;">
-            Linked Number: <strong style="color: var(--accent-gold);">${waSession.linkedNumber}</strong> | Engine: OpenWA / Baileys Web Protocol
+            Linked Phone: <strong style="color: var(--accent-gold);">${waSession.linkedNumber}</strong> | Engine: OpenWA / Baileys Protocol
           </p>
         </div>
 
         <div style="display: flex; gap: 0.8rem;">
           <button class="btn btn-primary" id="btn-wa-toggle-conn">
-            ${waSession.status === 'CONNECTED' ? '🔌 Disconnect Device' : '⚡ Connect WhatsApp Device'}
+            ${waSession.status === 'CONNECTED' ? '🔌 Re-Connect / Refresh Device' : '⚡ Connect WhatsApp Device'}
           </button>
           <button class="btn btn-secondary" id="btn-wa-gen-code">
             🔑 Generate Pairing Code
@@ -69,12 +69,12 @@ export function renderWhatsAppManager(container, state) {
         </div>
       ` : ''}
 
-      <!-- Section 2: Dual-Gateway Configuration & Failover Settings -->
+      <!-- Section 2: Primary WhatsApp Gateway Configuration -->
       <div style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 1.8rem; border-radius: var(--radius-md);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
           <div>
-            <h3 style="font-size: 1.2rem; color: var(--accent-gold);">⚡ Dual-Gateway & Failover Fallback Config</h3>
-            <p style="font-size: 0.82rem; color: var(--text-muted);">If Primary Gateway disconnects, notifications automatically failover to Secondary Gateway.</p>
+            <h3 style="font-size: 1.2rem; color: var(--accent-gold);">⚡ Primary WhatsApp Gateway Config</h3>
+            <p style="font-size: 0.82rem; color: var(--text-muted);">Direct OpenWA / Baileys WhatsApp Gateway for storefront automated order notifications.</p>
           </div>
           <button class="btn btn-secondary" id="btn-wa-send-test" style="font-size: 0.8rem; padding: 0.5rem 1rem;">
             ✉️ Send Test Message
@@ -82,38 +82,26 @@ export function renderWhatsAppManager(container, state) {
         </div>
 
         <form id="wa-gateway-form">
-          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-            <!-- Primary Gateway -->
-            <div style="background: var(--bg-secondary); padding: 1.2rem; border-radius: var(--radius-sm); border: 1px solid var(--border-gold);">
-              <h4 style="color: var(--accent-gold); margin-bottom: 0.8rem; font-size: 0.95rem;">1. Primary Gateway (Default)</h4>
-              
+          <div style="background: var(--bg-secondary); padding: 1.4rem; border-radius: var(--radius-sm); border: 1px solid var(--border-gold); margin-bottom: 1rem;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
               <div class="form-group">
-                <label class="form-label">Provider Name</label>
-                <input type="text" name="primaryProvider" class="form-input" value="${waConfig.primaryProvider}" />
+                <label class="form-label">Gateway Provider / Name</label>
+                <input type="text" name="primaryProvider" class="form-input" value="${waConfig.primaryProvider || 'OpenWA / Baileys Engine'}" />
               </div>
               <div class="form-group">
-                <label class="form-label">Endpoint URL / Session Host</label>
-                <input type="text" name="primaryEndpoint" class="form-input" value="${waConfig.primaryEndpoint}" />
+                <label class="form-label">Linked Admin Phone Number</label>
+                <input type="text" name="linkedNumber" class="form-input" value="${waSession.linkedNumber || '+92 300 1234567'}" />
               </div>
             </div>
 
-            <!-- Secondary Fallback Gateway -->
-            <div style="background: var(--bg-secondary); padding: 1.2rem; border-radius: var(--radius-sm); border: 1px solid var(--border-light);">
-              <h4 style="color: #ffffff; margin-bottom: 0.8rem; font-size: 0.95rem;">2. Secondary Fallback Gateway</h4>
-              
-              <div class="form-group">
-                <label class="form-label">Fallback Provider</label>
-                <input type="text" name="fallbackProvider" class="form-input" value="${waConfig.fallbackProvider}" />
-              </div>
-              <div class="form-group">
-                <label class="form-label">API Key / Token</label>
-                <input type="password" name="fallbackApiKey" class="form-input" value="${waConfig.fallbackApiKey}" />
-              </div>
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">API Endpoint / Host URL</label>
+              <input type="text" name="primaryEndpoint" class="form-input" value="${waConfig.primaryEndpoint || 'http://localhost:3000/api/whatsapp/send'}" />
             </div>
           </div>
 
-          <button type="submit" class="btn btn-primary" style="margin-top: 1.2rem;">
-            💾 Save Gateway Credentials & Failover Rules
+          <button type="submit" class="btn btn-primary">
+            💾 Save Primary WhatsApp Gateway Settings
           </button>
         </form>
       </div>
@@ -287,12 +275,17 @@ export function renderWhatsAppManager(container, state) {
   gwForm?.addEventListener('submit', (e) => {
     e.preventDefault();
     const fd = new FormData(gwForm);
+    
+    if (fd.get('linkedNumber')) {
+      state.whatsappSession.linkedNumber = fd.get('linkedNumber');
+      appStore.saveStorage('kreid_wa_session', state.whatsappSession);
+    }
+
     appStore.updateWhatsAppConfig({
       primaryProvider: fd.get('primaryProvider'),
-      primaryEndpoint: fd.get('primaryEndpoint'),
-      fallbackProvider: fd.get('fallbackProvider'),
-      fallbackApiKey: fd.get('fallbackApiKey')
+      primaryEndpoint: fd.get('primaryEndpoint')
     });
+    renderWhatsAppManager(container, appStore.state);
   });
 
   // Save Templates Form
