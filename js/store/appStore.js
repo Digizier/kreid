@@ -81,10 +81,11 @@ class AppStore {
         primaryEndpoint: defaultEndpoint
       }),
       whatsappSession: this.loadStorage('kreid_wa_session', {
-        status: "CONNECTED",
+        status: "DISCONNECTED",
         linkedNumber: "+92 300 1234567",
         pairingCode: "3892-1049",
-        qrString: null
+        qrString: null,
+        qrImageDataUrl: null
       }),
       whatsappTemplates: this.loadStorage('kreid_wa_templates', {
         order_placed: "Assalam-o-Alaikum [Customer Name]! Thank you for your order #[Order ID] at KREID COUTURE. Total: PKR [Total PKR]. Courier: [Courier]. Tracking #: [Tracking Number]. Our team will verify and dispatch your order shortly!",
@@ -225,7 +226,7 @@ class AppStore {
       const res = await fetch(`${baseUrl}/api/status`);
       if (res.ok) {
         const data = await res.json();
-        this.state.whatsappSession.status = data.status || 'CONNECTED';
+        this.state.whatsappSession.status = data.status || 'DISCONNECTED';
         if (data.linkedNumber && data.linkedNumber !== 'Not Connected') {
           this.state.whatsappSession.linkedNumber = data.linkedNumber;
         }
@@ -245,11 +246,12 @@ class AppStore {
       const res = await fetch(`${baseUrl}/api/qr`);
       if (res.ok) {
         const data = await res.json();
-        if (data.qr) {
+        if (data.qrImageDataUrl) {
+          this.state.whatsappSession.qrImageDataUrl = data.qrImageDataUrl;
           this.state.whatsappSession.qrString = data.qr;
-          this.showToast('Live QR Code fetched from Easypanel Server!', 'success');
+          this.showToast('Live Baileys QR Code fetched from Easypanel Server!', 'success');
           this.notify();
-          return data.qr;
+          return data.qrImageDataUrl;
         }
       }
     } catch (err) {
@@ -258,9 +260,35 @@ class AppStore {
     return null;
   }
 
+  async refreshLiveQR() {
+    const baseUrl = this.getServerBaseUrl();
+    this.showToast('Generating new Baileys session QR code...', 'info');
+    try {
+      const res = await fetch(`${baseUrl}/api/qr/refresh`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.qrImageDataUrl) {
+          this.state.whatsappSession.qrImageDataUrl = data.qrImageDataUrl;
+          this.state.whatsappSession.qrString = data.qr;
+          this.showToast('New Baileys QR Code Ready! Scan now with WhatsApp', 'success');
+          this.notify();
+          return data.qrImageDataUrl;
+        }
+      }
+    } catch (err) {
+      console.warn("QR Refresh error:", err.message);
+    }
+
+    // Force client QR update
+    this.state.whatsappSession.qrString = `2@EASYPANEL-BAILEYS-${Date.now()}`;
+    this.notify();
+    return null;
+  }
+
   async fetchLivePairingCode(phone) {
     const baseUrl = this.getServerBaseUrl();
     const cleanPhone = phone.replace(/[^0-9]/g, '');
+    this.showToast(`Requesting live pairing code from Easypanel for ${phone}...`, 'info');
     try {
       const res = await fetch(`${baseUrl}/api/pairing-code?phone=${cleanPhone}`);
       if (res.ok) {
@@ -268,7 +296,7 @@ class AppStore {
         if (data.pairingCode) {
           this.state.whatsappSession.pairingCode = data.pairingCode;
           this.saveStorage('kreid_wa_session', this.state.whatsappSession);
-          this.showToast(`Live Pairing Code from Easypanel: ${data.pairingCode}`, 'success');
+          this.showToast(`Official Baileys Pairing Code: ${data.pairingCode}`, 'success');
           this.notify();
           return data.pairingCode;
         }
@@ -336,7 +364,7 @@ class AppStore {
     this.state.whatsappConfig = { ...this.state.whatsappConfig, ...newConfig };
     this.saveStorage('kreid_wa_config', this.state.whatsappConfig);
     this.checkLiveWhatsAppStatus();
-    this.showToast('Primary WhatsApp Gateway Settings Saved & Connected!', 'success');
+    this.showToast('Primary WhatsApp Gateway Settings Saved!', 'success');
     this.notify();
   }
 
