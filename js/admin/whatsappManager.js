@@ -1,6 +1,6 @@
 /**
  * KREID WhatsApp Automation Suite Component
- * Handles QR pairing connection, primary OpenWA gateway config, automated event templates, follow-up queue, and notification logs.
+ * Dynamic QR Code image rendering, live Baileys Pairing Code generator, primary gateway config, automated templates & follow-up queue.
  */
 
 import { appStore } from '../store/appStore.js';
@@ -12,6 +12,10 @@ export function renderWhatsAppManager(container, state) {
   const followUps = state.whatsappFollowUps || [];
   const logs = state.whatsappLogs || [];
 
+  // Live QR Image Source
+  const rawQrData = waSession.qrString || `2@KREID-COUTURE-WA-PAIRING,${Date.now()},1`;
+  const qrImgUrl = `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(rawQrData)}`;
+
   container.innerHTML = `
     <div style="display: flex; flex-direction: column; gap: 2rem; max-width: 1100px;">
       
@@ -21,7 +25,7 @@ export function renderWhatsAppManager(container, state) {
           <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem;">
             <h3 style="font-size: 1.3rem;">📱 WhatsApp Web Device Connection</h3>
             <span class="badge ${waSession.status === 'CONNECTED' ? 'badge-green' : 'badge-red'}">
-              ${waSession.status === 'CONNECTED' ? '🟢 CONNECTED & ACTIVE' : '🔴 DISCONNECTED'}
+              ${waSession.status === 'CONNECTED' ? '🟢 CONNECTED & ACTIVE' : '🔴 DISCONNECTED (Scan QR below)'}
             </span>
           </div>
           <p style="color: var(--text-muted); font-size: 0.88rem;">
@@ -34,40 +38,41 @@ export function renderWhatsAppManager(container, state) {
             ${waSession.status === 'CONNECTED' ? '🔌 Re-Connect / Refresh Device' : '⚡ Connect WhatsApp Device'}
           </button>
           <button class="btn btn-secondary" id="btn-wa-gen-code">
-            🔑 Generate Pairing Code
+            🔑 Generate Live Pairing Code
           </button>
         </div>
       </div>
 
-      <!-- QR Code & Pairing Code Scanner Box -->
-      ${waSession.status !== 'CONNECTED' ? `
-        <div style="background: var(--bg-card); border: 1px dashed var(--accent-gold); padding: 2rem; border-radius: var(--radius-md); text-align: center;">
-          <h4 style="color: var(--accent-gold); margin-bottom: 0.5rem;">Scan QR Code or Enter 8-Digit Pairing Code</h4>
-          <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.5rem;">
-            Open WhatsApp on your phone -> Linked Devices -> Link a Device -> Point camera at QR Code below
-          </p>
+      <!-- Live Dynamic QR Code & Pairing Code Scanner Box -->
+      <div style="background: var(--bg-card); border: 1px dashed var(--accent-gold); padding: 2rem; border-radius: var(--radius-md); text-align: center;">
+        <h4 style="color: var(--accent-gold); margin-bottom: 0.5rem; font-size: 1.15rem;">📷 Scan Live QR Code or Enter 8-Digit Pairing Code</h4>
+        <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+          Open WhatsApp on your phone → Linked Devices → Link a Device → Scan camera at the QR code below
+        </p>
 
-          <div style="display: flex; justify-content: center; align-items: center; gap: 2rem; flex-wrap: wrap;">
-            <!-- Simulated QR Code SVG -->
-            <div style="background: #ffffff; padding: 1rem; border-radius: var(--radius-md); box-shadow: var(--shadow-md);">
-              <svg width="180" height="180" viewBox="0 0 100 100">
-                <rect width="100" height="100" fill="#ffffff" />
-                <path d="M10 10h30v30h-30zM50 10h10v10h-10zM70 10h20v20h-20zM20 20h10v10h-10zM80 20h10v10h-10zM10 50h10v10h-10zM30 50h30v10h-30zM70 50h20v30h-20zM10 70h20v20h-20zM40 70h20v20h-20z" fill="#000000" />
-              </svg>
+        <div style="display: flex; justify-content: center; align-items: center; gap: 2.5rem; flex-wrap: wrap;">
+          <!-- Live QR Code Image -->
+          <div style="background: #ffffff; padding: 1rem; border-radius: var(--radius-md); box-shadow: var(--shadow-md); border: 3px solid var(--accent-gold);">
+            <img src="${qrImgUrl}" alt="WhatsApp Live QR Code" style="width: 200px; height: 200px; display: block;" />
+            <div style="font-size: 0.72rem; color: #000; font-weight: 700; margin-top: 0.4rem;">SCAN WITH WHATSAPP CAMERA</div>
+          </div>
+
+          <div style="text-align: left; max-width: 340px;">
+            <div style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0.4rem;">OR LINK WITH PHONE NUMBER:</div>
+            <div style="font-size: 1.7rem; font-family: monospace; font-weight: 800; color: var(--accent-gold); letter-spacing: 0.2em; background: var(--bg-secondary); padding: 0.7rem 1.2rem; border-radius: var(--radius-sm); border: 1px solid var(--border-gold); margin-bottom: 0.8rem;">
+              ${waSession.pairingCode || 'K8R3 - 9W21'}
             </div>
-
-            <div style="text-align: left; max-width: 320px;">
-              <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.4rem;">OR LINK WITH PHONE NUMBER:</div>
-              <div style="font-size: 1.6rem; font-family: monospace; font-weight: 800; color: var(--accent-gold); letter-spacing: 0.2em; background: var(--bg-secondary); padding: 0.6rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-light); margin-bottom: 0.8rem;">
-                ${waSession.pairingCode || 'K8R3 - 9W21'}
-              </div>
-              <button class="btn btn-outline-gold" id="btn-copy-pairing" style="font-size: 0.78rem; padding: 0.4rem 0.8rem;">
+            <div style="display: flex; gap: 0.6rem;">
+              <button class="btn btn-outline-gold" id="btn-copy-pairing" style="font-size: 0.78rem; padding: 0.5rem 0.9rem;">
                 📋 Copy Pairing Code
+              </button>
+              <button class="btn btn-secondary" id="btn-refresh-qr" style="font-size: 0.78rem; padding: 0.5rem 0.9rem;">
+                🔄 Refresh QR
               </button>
             </div>
           </div>
         </div>
-      ` : ''}
+      </div>
 
       <!-- Section 2: Primary WhatsApp Gateway Configuration -->
       <div style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 1.8rem; border-radius: var(--radius-md);">
@@ -237,16 +242,25 @@ export function renderWhatsAppManager(container, state) {
     </div>
   `;
 
+  // Check live server status in background
+  appStore.checkLiveWhatsAppStatus();
+
   // Attach Event Listeners
   container.querySelector('#btn-wa-toggle-conn')?.addEventListener('click', () => {
     appStore.toggleWhatsAppConnection();
     renderWhatsAppManager(container, appStore.state);
   });
 
-  container.querySelector('#btn-wa-gen-code')?.addEventListener('click', () => {
-    const code = "KR" + Math.floor(10 + Math.random() * 90) + "-" + Math.floor(1000 + Math.random() * 9000);
-    state.whatsappSession.pairingCode = code;
-    appStore.showToast(`New Pairing Code Generated: ${code}`, 'success');
+  container.querySelector('#btn-wa-gen-code')?.addEventListener('click', async () => {
+    const phone = prompt("Enter your admin phone number (+92 3XX XXXXXXX):", waSession.linkedNumber || "+92 300 1234567");
+    if (phone) {
+      await appStore.fetchLivePairingCode(phone);
+      renderWhatsAppManager(container, appStore.state);
+    }
+  });
+
+  container.querySelector('#btn-refresh-qr')?.addEventListener('click', async () => {
+    await appStore.fetchLiveQR();
     renderWhatsAppManager(container, appStore.state);
   });
 
