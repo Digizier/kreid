@@ -216,8 +216,10 @@ class AppStore {
 
   // Auto Purge Data Retention Engine for WhatsApp Logs & Follow-Ups
   purgeOldWhatsAppLogs(manualDays = null) {
-    const days = manualDays !== null ? manualDays : (this.state.whatsappConfig.retentionDays || 30);
+    const configDays = this.state.whatsappConfig ? this.state.whatsappConfig.retentionDays : 30;
+    const days = manualDays !== null ? manualDays : (configDays !== undefined && configDays !== null ? configDays : 30);
     if (days === 0) return 0; // 0 means Never auto-delete
+
 
     const cutoffTimestamp = Date.now() - (days * 86400000);
     const initialLogsCount = this.state.whatsappLogs.length;
