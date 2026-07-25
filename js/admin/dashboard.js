@@ -1,6 +1,6 @@
 /**
  * KREID Administrative Control Suite Dashboard
- * Integrated 127+ Pakistani City-by-City Custom Shipping Rate Manager, Today's Live Hourly Sales Graph (00:00-23:59), Admin Authentication Guard (kreid/kreid123@#), Advanced Product Editor, and "DELETE" Confirmation Wiping.
+ * Integrated 127+ Pakistani City-by-City Custom Shipping Rate Manager, Today's High-Tech Live Hourly Sales Graph with Y-Axis & Peak Value Badges, Admin Authentication Guard (kreid/kreid123@#), Advanced Product Editor, and "DELETE" Confirmation Wiping.
  */
 
 import { appStore } from '../store/appStore.js';
@@ -55,7 +55,7 @@ export function renderAdminDashboard(container, state) {
             🎟️ Discount Coupons (${state.coupons.length})
           </div>
           <div class="menu-item ${activeTab === 'settings' ? 'active' : ''}" data-tab="settings">
-            ⚙️ Gateway & Logistics
+            ⚙️ Payment Accounts Settings
           </div>
         </nav>
 
@@ -80,7 +80,7 @@ export function renderAdminDashboard(container, state) {
                 activeTab === 'orders' ? 'Order Fulfillment & Payment Proof Inspector' :
                 activeTab === 'cityrates' ? '127+ Pakistani Cities Custom Shipping Rates' :
                 activeTab === 'whatsapp' ? 'WhatsApp Automation & Dual-Gateway Suite' :
-                activeTab === 'coupons' ? 'Promotions & Coupons Engine' : 'Payment Accounts & Logistics Settings'}
+                activeTab === 'coupons' ? 'Promotions & Coupons Engine' : 'Payment Accounts Settings'}
             </h1>
             <p style="color: var(--text-muted); font-size: 0.85rem;">
               Connected Live to KREID Storefront Data Engine
@@ -247,22 +247,16 @@ export function renderAdminDashboard(container, state) {
       container.querySelectorAll('.city-rate-input').forEach(input => {
         ratesMap[input.dataset.city] = parseFloat(input.value) || 250;
       });
+
+      const extraItemInput = container.querySelector('#input-additional-product-fee');
+      if (extraItemInput) {
+        const extraFee = parseFloat(extraItemInput.value) || 50;
+        appStore.saveShippingConfig({ additionalItemFee: extraFee });
+      }
+
       appStore.saveAllCityShippingRates(ratesMap);
     });
   }
-
-  // Save Shipping Rules Form
-  const shippingForm = container.querySelector('#shipping-rules-form');
-  shippingForm?.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const fd = new FormData(shippingForm);
-    appStore.saveShippingConfig({
-      baseMetroFee: parseFloat(fd.get('baseMetroFee')) || 150,
-      baseOtherFee: parseFloat(fd.get('baseOtherFee')) || 250,
-      additionalItemFee: parseFloat(fd.get('additionalItemFee')) || 50
-    });
-    renderAdminDashboard(container, appStore.state);
-  });
 
   attachTableEventListeners(container, state);
 }
@@ -360,21 +354,27 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
         </div>
       </div>
 
-      <!-- Today's Live Sales Performance SVG Graph (00:00 - 23:59) -->
-      <div class="chart-container">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+      <!-- High-Tech Professional Today's Live Sales Analytics SVG Graph (00:00 - 23:59) -->
+      <div class="chart-container" style="background: var(--bg-card); border: 1.5px solid var(--border-gold); padding: 1.5rem; border-radius: var(--radius-md); box-shadow: 0 15px 40px rgba(0,0,0,0.6); position: relative;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
           <div>
-            <h3 style="font-size: 1.1rem; color: var(--accent-gold);">📈 Today's Live Sales Performance Graph (00:00 - 23:59)</h3>
-            <p style="font-size: 0.8rem; color: var(--text-muted);">Real-time hourly breakdown calculated strictly from TODAY'S customer orders</p>
+            <h3 style="font-size: 1.15rem; color: var(--accent-gold); font-weight: 800; display: flex; align-items: center; gap: 0.5rem;">
+              <span>📈</span> Today's Live Hourly Sales Performance Graph (00:00 - 23:59)
+            </h3>
+            <p style="font-size: 0.82rem; color: var(--text-muted); margin-top: 0.2rem;">
+              Real-time hourly sales breakdown (PKR) calculated strictly from TODAY'S customer storefront orders
+            </p>
           </div>
-          <span class="badge badge-green">TODAY LIVE (00:00 - 23:59)</span>
+          <span class="badge badge-green" style="font-weight: 800; letter-spacing: 0.05em; padding: 0.5rem 0.9rem;">
+            🟢 TODAY LIVE (00:00 - 23:59)
+          </span>
         </div>
 
         ${renderTodayLiveSVGChart(state.orders)}
       </div>
 
       <!-- Recent Live Orders -->
-      <h3 style="font-size: 1.2rem; margin-bottom: 1rem;">Recent Customer Orders</h3>
+      <h3 style="font-size: 1.2rem; margin-bottom: 1rem; margin-top: 1.8rem;">Recent Customer Orders</h3>
       ${renderOrdersTable(state.orders.slice(0, 5))}
     `;
   }
@@ -484,22 +484,31 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
 
   if (activeTab === 'cityrates') {
     const ratesMap = state.cityShippingRates || {};
+    const addFee = (state.shippingConfig && state.shippingConfig.additionalItemFee !== undefined) ? state.shippingConfig.additionalItemFee : 50;
+
     return `
-      <!-- City Rates Manager Top Banner -->
-      <div style="background: var(--bg-card); border: 1.5px solid var(--accent-gold); border-radius: var(--radius-md); padding: 1.5rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+      <!-- City Rates Manager Top Banner & Consolidated Extra Item Fee Input -->
+      <div style="background: var(--bg-card); border: 1.5px solid var(--accent-gold); border-radius: var(--radius-md); padding: 1.5rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1.2rem; box-shadow: 0 10px 30px rgba(0,0,0,0.5);">
         <div>
           <h3 style="color: var(--accent-gold); font-size: 1.25rem; font-weight: 800; margin-bottom: 0.3rem;">
-            🏙️ 127+ Pakistani Cities Custom Delivery Fee Manager
+            🏙️ Consolidated 127+ Pakistani Cities Shipping Manager
           </h3>
           <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">
-            Set custom delivery charges for each individual Pakistani city (e.g. Karachi = 150 PKR, Lahore = 300 PKR, Quetta = 220 PKR).
+            Set exact delivery rates per Pakistani city + fee for extra products added to cart.
           </p>
         </div>
 
-        <div style="display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap;">
-          <input type="text" id="input-search-city-rates" placeholder="🔍 Filter City (e.g. Karachi, Lahore)..." style="padding: 0.6rem 1rem; width: 250px; background: var(--bg-primary); border: 1px solid var(--border-gold); color: #fff; border-radius: var(--radius-sm); font-size: 0.85rem;" />
+        <div style="display: flex; gap: 1rem; align-items: center; flex-wrap: wrap;">
+          <div style="background: var(--bg-secondary); border: 1px solid var(--border-gold); padding: 0.5rem 0.9rem; border-radius: var(--radius-sm); display: flex; align-items: center; gap: 0.6rem;">
+            <label style="font-size: 0.82rem; color: #fff; font-weight: 700;">➕ Additional Product Fee:</label>
+            <span style="font-size: 0.82rem; color: var(--accent-gold); font-weight: 800;">PKR</span>
+            <input type="number" id="input-additional-product-fee" value="${addFee}" min="0" max="500" style="width: 75px; padding: 0.3rem; background: var(--bg-primary); border: 1px solid var(--border-gold); color: #fff; border-radius: 4px; font-weight: 800; text-align: center;" />
+          </div>
+
+          <input type="text" id="input-search-city-rates" placeholder="🔍 Filter City (e.g. Karachi, Lahore)..." style="padding: 0.6rem 1rem; width: 230px; background: var(--bg-primary); border: 1px solid var(--border-gold); color: #fff; border-radius: var(--radius-sm); font-size: 0.85rem;" />
+          
           <button id="btn-save-all-city-rates" class="btn btn-primary" style="padding: 0.6rem 1.2rem; font-size: 0.85rem; font-weight: 800; white-space: nowrap;">
-            💾 SAVE ALL 127 CITY SHIPPING RATES
+            💾 SAVE ALL 127 CITY RATES
           </button>
         </div>
       </div>
@@ -597,41 +606,9 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
 
   if (activeTab === 'settings') {
     const pay = state.paymentSettings;
-    const ship = state.shippingConfig || { baseMetroFee: 150, baseOtherFee: 250, additionalItemFee: 50 };
     return `
       <div style="max-width: 850px; display: flex; flex-direction: column; gap: 1.5rem;">
         
-        <!-- Location & Weight Shipping Rules Form -->
-        <div style="background: var(--bg-card); border: 1.5px solid var(--accent-gold); border-radius: var(--radius-md); padding: 1.5rem;">
-          <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1rem;">
-            <span style="font-size: 1.6rem; color: var(--accent-gold);">🚚</span>
-            <div>
-              <h3 style="color: var(--accent-gold); font-size: 1.15rem; font-weight: 800;">Additional Product Shipping Fee Settings</h3>
-              <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0;">Configure extra item fee added to customer cart when purchasing multiple products</p>
-            </div>
-          </div>
-
-          <form id="shipping-rules-form">
-            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-              <div class="form-group">
-                <label class="form-label">Major Metro Base Fee (PKR) *</label>
-                <input type="number" name="baseMetroFee" value="${ship.baseMetroFee}" class="form-input" required />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Other Cities Base Fee (PKR) *</label>
-                <input type="number" name="baseOtherFee" value="${ship.baseOtherFee}" class="form-input" required />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Additional Product Fee (PKR) *</label>
-                <input type="number" name="additionalItemFee" value="${ship.additionalItemFee}" class="form-input" required />
-              </div>
-            </div>
-            <button type="submit" class="btn btn-primary" style="padding: 0.6rem 1.2rem; font-size: 0.85rem;">
-              💾 Save Shipping Calculator Rules
-            </button>
-          </form>
-        </div>
-
         <div style="background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.5rem;">
           <h3 style="color: var(--accent-gold); font-size: 1.1rem; margin-bottom: 1rem;">📱 JazzCash Account Settings</h3>
           <form id="jazzcash-settings-form">
@@ -698,7 +675,7 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
 }
 
 /**
- * Calculates and renders TODAY'S LIVE HOURLY SALES GRAPH (00:00 - 23:59)
+ * Calculates and renders TODAY'S LIVE HOURLY SALES GRAPH WITH Y-AXIS CURRENCY SCALES AND PEAK VALUE BADGES (00:00 - 23:59)
  */
 function renderTodayLiveSVGChart(orders) {
   const hourlyData = Array(24).fill(0);
@@ -718,15 +695,21 @@ function renderTodayLiveSVGChart(orders) {
     }
   });
 
-  const maxVal = Math.max(...hourlyData, 10000);
-  const chartHeight = 180;
-  const chartWidth = 900;
-  const paddingX = 40;
-  const paddingY = 20;
+  const rawMax = Math.max(...hourlyData);
+  const maxVal = rawMax > 0 ? Math.ceil(rawMax / 2000) * 2000 : 10000;
+  const chartHeight = 220;
+  const chartWidth = 920;
+  const paddingLeft = 85;
+  const paddingRight = 40;
+  const paddingTop = 35;
+  const paddingBottom = 35;
+
+  const innerWidth = chartWidth - paddingLeft - paddingRight;
+  const innerHeight = chartHeight - paddingTop - paddingBottom;
 
   const points = hourlyData.map((val, idx) => {
-    const x = paddingX + (idx / 23) * (chartWidth - paddingX * 2);
-    const y = chartHeight - paddingY - (val / maxVal) * (chartHeight - paddingY * 2);
+    const x = paddingLeft + (idx / 23) * innerWidth;
+    const y = chartHeight - paddingBottom - (val / maxVal) * innerHeight;
     return `${x},${y}`;
   }).join(' ');
 
@@ -734,41 +717,74 @@ function renderTodayLiveSVGChart(orders) {
     return `${idx.toString().padStart(2, '0')}:00`;
   });
 
+  const yTicks = [0, maxVal * 0.25, maxVal * 0.5, maxVal * 0.75, maxVal];
+
   return `
     <div style="width: 100%; overflow-x: auto;">
-      <svg viewBox="0 0 ${chartWidth} ${chartHeight + 35}" style="width: 100%; height: auto; min-width: 600px; background: rgba(0,0,0,0.3); border-radius: var(--radius-sm); border: 1px solid var(--border-light);">
+      <svg viewBox="0 0 ${chartWidth} ${chartHeight + 20}" style="width: 100%; height: auto; min-width: 650px; background: rgba(0,0,0,0.4); border-radius: var(--radius-sm); border: 1px solid var(--border-gold);">
         <defs>
-          <linearGradient id="todaySalesGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="var(--accent-gold)" stop-opacity="0.45" />
+          <linearGradient id="todaySalesGradHighTech" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--accent-gold)" stop-opacity="0.5" />
             <stop offset="100%" stop-color="var(--accent-gold)" stop-opacity="0.0" />
           </linearGradient>
         </defs>
 
+        <!-- Horizontal Gridlines & Y-Axis Scale Labels -->
+        ${yTicks.map(tickVal => {
+          const y = chartHeight - paddingBottom - (tickVal / maxVal) * innerHeight;
+          return `
+            <line x1="${paddingLeft}" y1="${y}" x2="${chartWidth - paddingRight}" y2="${y}" stroke="rgba(255,255,255,0.08)" stroke-dasharray="4 4" />
+            <text x="${paddingLeft - 10}" y="${y + 4}" fill="var(--accent-gold)" font-size="10" text-anchor="end" font-weight="700" font-family="monospace">
+              PKR ${Math.round(tickVal).toLocaleString()}
+            </text>
+          `;
+        }).join('')}
+
+        <!-- Gradient Fill under Polyline -->
         <polyline
-          fill="url(#todaySalesGrad)"
+          fill="url(#todaySalesGradHighTech)"
           stroke="none"
-          points="${paddingX},${chartHeight - paddingY} ${points} ${chartWidth - paddingX},${chartHeight - paddingY}"
+          points="${paddingLeft},${chartHeight - paddingBottom} ${points} ${chartWidth - paddingRight},${chartHeight - paddingBottom}"
         />
 
+        <!-- Glowing Polyline -->
         <polyline
           fill="none"
           stroke="var(--accent-gold)"
-          stroke-width="3"
+          stroke-width="3.5"
           stroke-linecap="round"
           stroke-linejoin="round"
           points="${points}"
         />
 
+        <!-- Data Nodes & Peak Value Badges -->
         ${hourlyData.map((val, idx) => {
-          const x = paddingX + (idx / 23) * (chartWidth - paddingX * 2);
-          const y = chartHeight - paddingY - (val / maxVal) * (chartHeight - paddingY * 2);
+          const x = paddingLeft + (idx / 23) * innerWidth;
+          const y = chartHeight - paddingBottom - (val / maxVal) * innerHeight;
+          const hasSales = val > 0;
+
           return `
-            <circle cx="${x}" cy="${y}" r="4" fill="var(--accent-gold)" stroke="#000" stroke-width="1.5" />
-            ${idx % 3 === 0 ? `
-              <text x="${x}" y="${chartHeight + 20}" fill="var(--text-muted)" font-size="10" text-anchor="middle" font-family="sans-serif">
-                ${labels[idx]}
-              </text>
-            ` : ''}
+            <g class="chart-node-group">
+              <title>⏰ Hour: ${labels[idx]} | Sales: PKR ${val.toLocaleString()}</title>
+              
+              <!-- Circle Node -->
+              <circle cx="${x}" cy="${y}" r="${hasSales ? 6 : 3.5}" fill="${hasSales ? 'var(--accent-gold)' : '#555'}" stroke="#000" stroke-width="2" />
+
+              ${hasSales ? `
+                <!-- Value Badge Label Above Data Node -->
+                <rect x="${x - 38}" y="${y - 28}" width="76" height="18" rx="4" fill="rgba(212,175,55,0.95)" />
+                <text x="${x}" y="${y - 15}" fill="#000000" font-size="9.5" text-anchor="middle" font-weight="900" font-family="sans-serif">
+                  PKR ${val.toLocaleString()}
+                </text>
+              ` : ''}
+
+              <!-- X-Axis Hour Label -->
+              ${idx % 3 === 0 ? `
+                <text x="${x}" y="${chartHeight + 12}" fill="var(--text-muted)" font-size="10" text-anchor="middle" font-weight="700" font-family="monospace">
+                  ${labels[idx]}
+                </text>
+              ` : ''}
+            </g>
           `;
         }).join('')}
       </svg>
