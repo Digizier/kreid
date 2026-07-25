@@ -1,6 +1,6 @@
 /**
  * Header Component for KREID Storefront
- * Featuring Premium Live Instant Search Overlay Modal with Real-Time Product Previews
+ * Featuring Full-Width Top Luxury Search Drawer with Instant Centered Product Grid & Quick Tags
  */
 
 import { appStore } from '../store/appStore.js';
@@ -36,11 +36,12 @@ export function renderHeader(container, state) {
 
         <!-- Right Action Tray -->
         <div class="header-actions">
-          <!-- Search Icon Button -->
-          <button class="action-btn" id="btn-open-search" title="Search Catalog">
-            🔍
-            ${state.searchQuery ? `<span class="badge-count" style="background: var(--accent-gold); color: #000;">✓</span>` : ''}
-          </button>
+          <!-- Inline Header Search Input Bar -->
+          <div id="inline-search-bar-wrap" style="position: relative; display: flex; align-items: center; background: var(--bg-secondary); border: 1.5px solid var(--border-gold); border-radius: var(--radius-full); padding: 0.35rem 0.9rem; width: 220px; transition: all 0.3s ease;">
+            <span style="font-size: 0.9rem; margin-right: 0.5rem; opacity: 0.7;">🔍</span>
+            <input type="text" id="header-search-input" placeholder="Search catalog..." value="${state.searchQuery || ''}" style="width: 100%; background: transparent; border: none; outline: none; color: #ffffff; font-size: 0.85rem; font-family: inherit;" />
+            ${state.searchQuery ? `<button id="btn-clear-header-search" style="background: transparent; border: none; color: var(--text-muted); font-size: 0.85rem; cursor: pointer; padding: 0;">✕</button>` : ''}
+          </div>
 
           <!-- Favorites / Wishlist Icon -->
           <button class="action-btn" id="btn-open-wishlist" title="Favorites">
@@ -57,22 +58,22 @@ export function renderHeader(container, state) {
       </div>
     </header>
 
-    <!-- Live Search Overlay Modal -->
-    <div id="search-overlay-modal" class="modal-backdrop" style="display: none; align-items: flex-start; padding-top: 5vh; z-index: 9999;">
-      <div class="modal-content" style="max-width: 780px; width: 92%; background: var(--bg-card); border: 1.5px solid var(--accent-gold); border-radius: var(--radius-md); box-shadow: 0 20px 60px rgba(0,0,0,0.8); overflow: hidden;">
+    <!-- Full-Width Top Search Overlay Drawer -->
+    <div id="search-overlay-modal" class="modal-backdrop" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); z-index: 10000; justify-content: center; align-items: flex-start; padding: 2rem 1rem;">
+      <div style="background: var(--bg-card); border: 1.5px solid var(--accent-gold); border-radius: var(--radius-md); width: 100%; max-width: 1100px; max-height: 85vh; display: flex; flex-direction: column; box-shadow: 0 30px 80px rgba(0,0,0,0.9); overflow: hidden;">
         
-        <!-- Search Header Bar -->
-        <div style="padding: 1.2rem 1.6rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border-light); display: flex; align-items: center; justify-content: space-between;">
-          <div style="display: flex; align-items: center; gap: 0.8rem; width: 100%;">
-            <span style="font-size: 1.3rem;">🔍</span>
-            <input type="text" id="live-search-input" placeholder="Search sneakers, cargo pants, t-shirts, sizes (e.g. Jordan, Baggy, 42)..." value="${state.searchQuery || ''}" style="width: 100%; background: transparent; border: none; outline: none; color: #ffffff; font-size: 1.1rem; font-family: inherit;" />
+        <!-- Large Search Bar Bar -->
+        <div style="padding: 1.4rem 2rem; background: var(--bg-secondary); border-bottom: 1px solid var(--border-gold); display: flex; align-items: center; justify-content: space-between; gap: 1rem;">
+          <div style="display: flex; align-items: center; gap: 1rem; width: 100%;">
+            <span style="font-size: 1.6rem; color: var(--accent-gold);">🔍</span>
+            <input type="text" id="live-search-input" placeholder="Search sneakers, baggy denim, t-shirts, sizes (e.g. Jordan, Baggy, 42)..." value="${state.searchQuery || ''}" style="width: 100%; background: transparent; border: none; outline: none; color: #ffffff; font-size: 1.25rem; font-family: inherit; font-weight: 600;" />
           </div>
-          <button id="btn-close-search" style="background: transparent; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; padding: 0 0.5rem;">✕</button>
+          <button id="btn-close-search" style="background: var(--bg-primary); border: 1px solid var(--border-light); color: #ffffff; width: 40px; height: 40px; border-radius: 50%; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease;">✕</button>
         </div>
 
-        <!-- Quick Trending Tags -->
-        <div style="padding: 0.8rem 1.6rem; background: rgba(212,175,55,0.05); border-bottom: 1px solid var(--border-light); display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;">
-          <span style="font-size: 0.78rem; color: var(--accent-gold); font-weight: 700;">POPULAR SEARCHES:</span>
+        <!-- Quick Trending Search Tags -->
+        <div style="padding: 0.9rem 2rem; background: rgba(212,175,55,0.06); border-bottom: 1px solid var(--border-light); display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;">
+          <span style="font-size: 0.8rem; color: var(--accent-gold); font-weight: 800; letter-spacing: 0.05em;">POPULAR SEARCHES:</span>
           <button class="search-tag-chip" data-query="Jordan">Jordan 1</button>
           <button class="search-tag-chip" data-query="Baggy">Baggy Denim</button>
           <button class="search-tag-chip" data-query="Tee">Streetwear Tee</button>
@@ -80,15 +81,15 @@ export function renderHeader(container, state) {
           <button class="search-tag-chip" data-query="42">Size 42</button>
         </div>
 
-        <!-- Live Matching Results Box -->
-        <div id="live-search-results" style="max-height: 480px; overflow-y: auto; padding: 1.2rem 1.6rem;">
+        <!-- Centered Live Matching Grid -->
+        <div id="live-search-results" style="padding: 1.8rem 2rem; overflow-y: auto; flex: 1;">
           <!-- Results injected dynamically -->
         </div>
 
-        <!-- Search Footer Bar -->
-        <div style="padding: 0.9rem 1.6rem; background: var(--bg-secondary); border-top: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-size: 0.8rem; color: var(--text-muted);">Press <kbd style="background: var(--bg-primary); padding: 0.2rem 0.5rem; border-radius: 4px; border: 1px solid var(--border-light); color: #fff;">ESC</kbd> to exit</span>
-          <button class="btn btn-secondary" id="btn-clear-search-filter" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">
+        <!-- Footer Action Bar -->
+        <div style="padding: 1rem 2rem; background: var(--bg-secondary); border-top: 1px solid var(--border-light); display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 0.82rem; color: var(--text-muted);">Press <kbd style="background: var(--bg-primary); padding: 0.2rem 0.5rem; border-radius: 4px; border: 1px solid var(--border-light); color: #fff;">ESC</kbd> to close search</span>
+          <button class="btn btn-secondary" id="btn-clear-search-filter" style="font-size: 0.82rem; padding: 0.45rem 0.9rem;">
             Clear Search Filter
           </button>
         </div>
@@ -111,6 +112,7 @@ export function renderHeader(container, state) {
       e.preventDefault();
       const cat = link.dataset.category;
       appStore.setCategory(cat);
+      appStore.setSearchQuery('');
     });
   });
 
@@ -120,22 +122,46 @@ export function renderHeader(container, state) {
   const wishlistBtn = container.querySelector('#btn-open-wishlist');
   wishlistBtn?.addEventListener('click', () => appStore.toggleWishlistModal(true));
 
-  // Search Modal Elements
+  // Search Drawer Elements
   const searchModal = container.querySelector('#search-overlay-modal');
-  const searchInput = container.querySelector('#live-search-input');
+  const liveSearchInput = container.querySelector('#live-search-input');
+  const headerSearchInput = container.querySelector('#header-search-input');
   const resultsContainer = container.querySelector('#live-search-results');
 
-  function openSearchModal() {
+  function openSearchModal(initialQuery = '') {
     searchModal.style.display = 'flex';
-    setTimeout(() => searchInput.focus(), 50);
-    renderLiveSearchResults(searchInput.value.trim());
+    if (initialQuery) {
+      liveSearchInput.value = initialQuery;
+    }
+    setTimeout(() => liveSearchInput.focus(), 50);
+    renderLiveSearchResults(liveSearchInput.value.trim());
   }
 
   function closeSearchModal() {
     searchModal.style.display = 'none';
   }
 
-  container.querySelector('#btn-open-search')?.addEventListener('click', openSearchModal);
+  headerSearchInput?.addEventListener('focus', () => {
+    openSearchModal(headerSearchInput.value);
+  });
+
+  headerSearchInput?.addEventListener('input', (e) => {
+    const q = e.target.value.trim();
+    appStore.setSearchQuery(q);
+    if (searchModal.style.display !== 'flex') {
+      openSearchModal(q);
+    } else {
+      liveSearchInput.value = q;
+      renderLiveSearchResults(q);
+    }
+  });
+
+  container.querySelector('#btn-clear-header-search')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    headerSearchInput.value = '';
+    appStore.setSearchQuery('');
+  });
+
   container.querySelector('#btn-close-search')?.addEventListener('click', closeSearchModal);
 
   searchModal?.addEventListener('click', (e) => {
@@ -149,8 +175,9 @@ export function renderHeader(container, state) {
   });
 
   // Live Input Matching
-  searchInput?.addEventListener('input', (e) => {
+  liveSearchInput?.addEventListener('input', (e) => {
     const q = e.target.value.trim();
+    headerSearchInput.value = q;
     appStore.setSearchQuery(q);
     renderLiveSearchResults(q);
   });
@@ -159,14 +186,16 @@ export function renderHeader(container, state) {
   container.querySelectorAll('.search-tag-chip').forEach(chip => {
     chip.addEventListener('click', () => {
       const q = chip.dataset.query;
-      searchInput.value = q;
+      liveSearchInput.value = q;
+      headerSearchInput.value = q;
       appStore.setSearchQuery(q);
       renderLiveSearchResults(q);
     });
   });
 
   container.querySelector('#btn-clear-search-filter')?.addEventListener('click', () => {
-    searchInput.value = '';
+    liveSearchInput.value = '';
+    headerSearchInput.value = '';
     appStore.setSearchQuery('');
     renderLiveSearchResults('');
   });
@@ -188,30 +217,32 @@ export function renderHeader(container, state) {
 
     if (matches.length === 0) {
       resultsContainer.innerHTML = `
-        <div style="text-align: center; padding: 2.5rem 1rem; color: var(--text-muted);">
-          <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">🔍</div>
-          <h4 style="color: #fff; font-size: 1.1rem;">No matching items found for "${query}"</h4>
-          <p style="font-size: 0.85rem; margin-top: 0.4rem;">Try searching for "Jordan", "Baggy", "Trousers", or size "42"</p>
+        <div style="text-align: center; padding: 3rem 1rem; color: var(--text-muted);">
+          <div style="font-size: 3rem; margin-bottom: 0.6rem;">🔍</div>
+          <h4 style="color: #fff; font-size: 1.2rem;">No matching items found for "${query}"</h4>
+          <p style="font-size: 0.9rem; margin-top: 0.4rem;">Try searching for "Jordan", "Baggy", "Trousers", or size "42"</p>
         </div>
       `;
       return;
     }
 
     resultsContainer.innerHTML = `
-      <div style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
-        <span>Found <strong style="color: var(--accent-gold);">${matches.length}</strong> matching products${query ? ` for "${query}"` : ''}:</span>
+      <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.2rem; display: flex; justify-content: space-between; align-items: center;">
+        <span>Found <strong style="color: var(--accent-gold); font-size: 1.05rem;">${matches.length}</strong> matching products${query ? ` for "${query}"` : ''}:</span>
       </div>
 
-      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 1.4rem;">
         ${matches.map(p => `
-          <div class="search-item-card" data-id="${p.id}" style="background: var(--bg-secondary); border: 1px solid var(--border-light); border-radius: var(--radius-sm); padding: 0.8rem; display: flex; flex-direction: column; gap: 0.6rem; cursor: pointer; transition: all 0.2s ease;">
-            <img src="${p.image}" alt="${p.name}" style="width: 100%; height: 140px; object-fit: cover; border-radius: 4px;" />
+          <div class="search-item-card" data-id="${p.id}" style="background: var(--bg-secondary); border: 1.5px solid var(--border-light); border-radius: var(--radius-sm); padding: 1rem; display: flex; flex-direction: column; gap: 0.7rem; cursor: pointer; transition: all 0.25 ease; position: relative;">
+            <div style="overflow: hidden; border-radius: 6px;">
+              <img src="${p.image}" alt="${p.name}" style="width: 100%; height: 180px; object-fit: cover; transition: transform 0.3s ease;" />
+            </div>
             <div>
-              <span class="badge badge-gold" style="font-size: 0.68rem; margin-bottom: 0.3rem;">${p.category.toUpperCase()}</span>
-              <h5 style="font-size: 0.88rem; color: #fff; line-height: 1.25; margin-bottom: 0.4rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${p.name}</h5>
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: auto;">
-                <span style="color: var(--accent-gold); font-weight: 800; font-size: 0.95rem;">PKR ${p.price.toLocaleString()}</span>
-                <span style="font-size: 0.72rem; color: var(--text-muted);">${p.sizes ? p.sizes.slice(0, 3).join(', ') : ''}</span>
+              <span class="badge badge-gold" style="font-size: 0.7rem; margin-bottom: 0.4rem;">${p.category.toUpperCase()}</span>
+              <h5 style="font-size: 0.92rem; color: #fff; line-height: 1.3; margin-bottom: 0.4rem; font-weight: 700; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${p.name}</h5>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.4rem;">
+                <span style="color: var(--accent-gold); font-weight: 800; font-size: 1.05rem;">PKR ${p.price.toLocaleString()}</span>
+                <span style="font-size: 0.75rem; color: var(--text-muted);">${p.sizes ? p.sizes.slice(0, 3).join(', ') : ''}</span>
               </div>
             </div>
           </div>

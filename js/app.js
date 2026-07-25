@@ -102,25 +102,40 @@ function render(state) {
       filtered = filtered.filter(p => 
         p.name.toLowerCase().includes(q) || 
         p.category.toLowerCase().includes(q) ||
-        (p.description && p.description.toLowerCase().includes(q))
+        (p.description && p.description.toLowerCase().includes(q)) ||
+        (p.sizes && p.sizes.some(s => s.toLowerCase().includes(q))) ||
+        (p.color && p.color.toLowerCase().includes(q))
       );
     }
 
-    // Update Section Title
+    // Update Section Title & Active Search Notification Bar
     if (catalogTitle) {
-      catalogTitle.innerText = state.searchQuery 
-        ? `SEARCH RESULTS FOR "${state.searchQuery.toUpperCase()}"`
-        : state.activeCategory === 'all' ? 'FEATURED PRODUCTS' : `${state.activeCategory.toUpperCase()} COLLECTION`;
+      if (state.searchQuery) {
+        catalogTitle.innerHTML = `
+          <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; flex-wrap: wrap; gap: 1rem;">
+            <span>🔍 SEARCH RESULTS FOR "<span style="color: var(--accent-gold);">${state.searchQuery.toUpperCase()}</span>" (${filtered.length})</span>
+            <button class="btn btn-secondary" id="btn-clear-main-search" style="font-size: 0.8rem; padding: 0.4rem 0.8rem;">
+              ✕ Clear Search Filter
+            </button>
+          </div>
+        `;
+        document.getElementById('btn-clear-main-search')?.addEventListener('click', () => {
+          appStore.setSearchQuery('');
+        });
+      } else {
+        catalogTitle.innerText = state.activeCategory === 'all' ? 'FEATURED PRODUCTS' : `${state.activeCategory.toUpperCase()} COLLECTION`;
+      }
     }
 
     // Render Product Cards
     productsGridRoot.innerHTML = '';
     if (filtered.length === 0) {
       productsGridRoot.innerHTML = `
-        <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--text-muted);">
-          <div style="font-size: 3rem; margin-bottom: 0.5rem;">🔍</div>
-          <h3>No products found matching your filter</h3>
-          <button class="btn btn-primary" id="btn-reset-filter" style="margin-top: 1rem;">
+        <div style="grid-column: 1 / -1; text-align: center; padding: 4rem 1rem; color: var(--text-muted); background: var(--bg-card); border: 1px dashed var(--border-gold); border-radius: var(--radius-md);">
+          <div style="font-size: 3.5rem; margin-bottom: 0.8rem;">🔍</div>
+          <h3 style="color: #fff; font-size: 1.2rem; margin-bottom: 0.4rem;">No products found matching "${state.searchQuery || state.activeCategory}"</h3>
+          <p style="font-size: 0.88rem; margin-bottom: 1.2rem;">Try checking your spelling or searching for another keyword.</p>
+          <button class="btn btn-primary" id="btn-reset-filter">
             Show All Products
           </button>
         </div>
