@@ -1,13 +1,13 @@
 /**
  * KREID Administrative Control Suite Dashboard
- * Featuring Security Authentication Guard (kreid/kreid123@#), Advanced Product Catalog Editor with Local File Drag-Drop Uploads, Location & Additional Item Shipping Engine Settings, and High-Contrast Local UI Confirmation Modals.
+ * Integrated 127+ Pakistani City-by-City Custom Shipping Rate Manager, Today's Live Hourly Sales Graph (00:00-23:59), Admin Authentication Guard (kreid/kreid123@#), Advanced Product Editor, and "DELETE" Confirmation Wiping.
  */
 
 import { appStore } from '../store/appStore.js';
 import { renderWhatsAppManager } from './whatsappManager.js';
 import { majorMetroCities, allPakistanCities } from '../data/pakistanCities.js';
 
-let activeTab = 'dashboard'; // 'dashboard' | 'products' | 'orders' | 'coupons' | 'whatsapp' | 'settings'
+let activeTab = 'dashboard'; // 'dashboard' | 'products' | 'orders' | 'whatsapp' | 'coupons' | 'cityrates' | 'settings'
 let editingProduct = null;
 let uploadedImages = [];
 
@@ -45,6 +45,9 @@ export function renderAdminDashboard(container, state) {
           <div class="menu-item ${activeTab === 'orders' ? 'active' : ''}" data-tab="orders">
             🚚 Orders & Dispatch (${totalOrders})
           </div>
+          <div class="menu-item ${activeTab === 'cityrates' ? 'active' : ''}" data-tab="cityrates">
+            🏙️ City Delivery Rates (127)
+          </div>
           <div class="menu-item ${activeTab === 'whatsapp' ? 'active' : ''}" data-tab="whatsapp">
             📱 WhatsApp Automation
           </div>
@@ -52,7 +55,7 @@ export function renderAdminDashboard(container, state) {
             🎟️ Discount Coupons (${state.coupons.length})
           </div>
           <div class="menu-item ${activeTab === 'settings' ? 'active' : ''}" data-tab="settings">
-            ⚙️ Gateway & Shipping Rules
+            ⚙️ Gateway & Logistics
           </div>
         </nav>
 
@@ -72,11 +75,12 @@ export function renderAdminDashboard(container, state) {
         <div class="admin-top-bar">
           <div>
             <h1 class="admin-page-title">
-              ${activeTab === 'dashboard' ? 'Executive Overview & 24hr Hourly Live Analytics' :
+              ${activeTab === 'dashboard' ? "Executive Overview & Today's Live Sales Analytics" :
                 activeTab === 'products' ? 'Advanced Product Catalog Manager' :
                 activeTab === 'orders' ? 'Order Fulfillment & Payment Proof Inspector' :
+                activeTab === 'cityrates' ? '127+ Pakistani Cities Custom Shipping Rates' :
                 activeTab === 'whatsapp' ? 'WhatsApp Automation & Dual-Gateway Suite' :
-                activeTab === 'coupons' ? 'Promotions & Coupons Engine' : 'City Shipping Rules & Payment Accounts'}
+                activeTab === 'coupons' ? 'Promotions & Coupons Engine' : 'Payment Accounts & Logistics Settings'}
             </h1>
             <p style="color: var(--text-muted); font-size: 0.85rem;">
               Connected Live to KREID Storefront Data Engine
@@ -123,7 +127,7 @@ export function renderAdminDashboard(container, state) {
     if (waContainer) renderWhatsAppManager(waContainer, state);
   }
 
-  // Attach Sidebar Listeners & Logout
+  // Attach Sidebar Listeners
   const menuItems = container.querySelectorAll('.menu-item');
   menuItems.forEach(item => {
     item.addEventListener('click', () => {
@@ -213,6 +217,40 @@ export function renderAdminDashboard(container, state) {
     openCouponModal(container, state);
   });
 
+  // City Shipping Rates Tab Event Handlers
+  if (activeTab === 'cityrates') {
+    const citySearchInput = container.querySelector('#input-search-city-rates');
+    citySearchInput?.addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase().trim();
+      container.querySelectorAll('.city-rate-row').forEach(row => {
+        const cityName = row.dataset.city;
+        if (cityName.includes(query)) {
+          row.style.display = '';
+        } else {
+          row.style.display = 'none';
+        }
+      });
+    });
+
+    container.querySelectorAll('.btn-save-single-city').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const city = btn.dataset.city;
+        const input = container.querySelector(`.city-rate-input[data-city="${city}"]`);
+        if (input) {
+          appStore.saveCityShippingRate(city, input.value);
+        }
+      });
+    });
+
+    container.querySelector('#btn-save-all-city-rates')?.addEventListener('click', () => {
+      const ratesMap = {};
+      container.querySelectorAll('.city-rate-input').forEach(input => {
+        ratesMap[input.dataset.city] = parseFloat(input.value) || 250;
+      });
+      appStore.saveAllCityShippingRates(ratesMap);
+    });
+  }
+
   // Save Shipping Rules Form
   const shippingForm = container.querySelector('#shipping-rules-form');
   shippingForm?.addEventListener('submit', (e) => {
@@ -229,9 +267,6 @@ export function renderAdminDashboard(container, state) {
   attachTableEventListeners(container, state);
 }
 
-/**
- * High-Contrast Admin Security Login Screen Component
- */
 function renderAdminLoginScreen(container) {
   container.innerHTML = `
     <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg-primary); padding: 1.5rem;">
@@ -325,17 +360,17 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
         </div>
       </div>
 
-      <!-- 24-Hour Sales Performance SVG -->
+      <!-- Today's Live Sales Performance SVG Graph (00:00 - 23:59) -->
       <div class="chart-container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
           <div>
-            <h3 style="font-size: 1.1rem; color: var(--accent-gold);">📈 24-Hour (1h - 24h) Hourly Sales Performance</h3>
-            <p style="font-size: 0.8rem; color: var(--text-muted);">Real-time 1-hour breakdown calculated from storefront customer orders</p>
+            <h3 style="font-size: 1.1rem; color: var(--accent-gold);">📈 Today's Live Sales Performance Graph (00:00 - 23:59)</h3>
+            <p style="font-size: 0.8rem; color: var(--text-muted);">Real-time hourly breakdown calculated strictly from TODAY'S customer orders</p>
           </div>
-          <span class="badge badge-green">24-HOUR HOURLY LIVE</span>
+          <span class="badge badge-green">TODAY LIVE (00:00 - 23:59)</span>
         </div>
 
-        ${render24HourSVGChart(state.orders)}
+        ${renderTodayLiveSVGChart(state.orders)}
       </div>
 
       <!-- Recent Live Orders -->
@@ -447,6 +482,75 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
     `;
   }
 
+  if (activeTab === 'cityrates') {
+    const ratesMap = state.cityShippingRates || {};
+    return `
+      <!-- City Rates Manager Top Banner -->
+      <div style="background: var(--bg-card); border: 1.5px solid var(--accent-gold); border-radius: var(--radius-md); padding: 1.5rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <h3 style="color: var(--accent-gold); font-size: 1.25rem; font-weight: 800; margin-bottom: 0.3rem;">
+            🏙️ 127+ Pakistani Cities Custom Delivery Fee Manager
+          </h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin: 0;">
+            Set custom delivery charges for each individual Pakistani city (e.g. Karachi = 150 PKR, Lahore = 300 PKR, Quetta = 220 PKR).
+          </p>
+        </div>
+
+        <div style="display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap;">
+          <input type="text" id="input-search-city-rates" placeholder="🔍 Filter City (e.g. Karachi, Lahore)..." style="padding: 0.6rem 1rem; width: 250px; background: var(--bg-primary); border: 1px solid var(--border-gold); color: #fff; border-radius: var(--radius-sm); font-size: 0.85rem;" />
+          <button id="btn-save-all-city-rates" class="btn btn-primary" style="padding: 0.6rem 1.2rem; font-size: 0.85rem; font-weight: 800; white-space: nowrap;">
+            💾 SAVE ALL 127 CITY SHIPPING RATES
+          </button>
+        </div>
+      </div>
+
+      <!-- 127 Cities Rate Table -->
+      <div class="admin-table-wrap">
+        <form id="city-shipping-rates-form">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>City Name</th>
+                <th>Region / Tier Badge</th>
+                <th>Custom Delivery Rate (PKR)</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="city-rates-table-body">
+              ${allPakistanCities.map(city => {
+                const currentRate = ratesMap[city] !== undefined ? ratesMap[city] : (majorMetroCities.includes(city) ? 150 : 250);
+                const isMetro = majorMetroCities.includes(city);
+                return `
+                  <tr class="city-rate-row" data-city="${city.toLowerCase()}">
+                    <td>
+                      <strong style="color: #ffffff; font-size: 1rem;">${city}</strong>
+                    </td>
+                    <td>
+                      <span class="badge ${isMetro ? 'badge-green' : 'badge-gold'}">
+                        ${isMetro ? '🌟 MAJOR METROPOLITAN HUB' : '📍 REGIONAL CITY'}
+                      </span>
+                    </td>
+                    <td>
+                      <div style="display: flex; align-items: center; gap: 0.5rem;">
+                        <span style="font-size: 0.85rem; color: var(--accent-gold); font-weight: 700;">PKR</span>
+                        <input type="number" class="city-rate-input form-input" data-city="${city}" value="${currentRate}" min="0" max="2000" style="width: 110px; padding: 0.4rem 0.6rem; font-weight: 800; text-align: center; color: #fff; background: var(--bg-primary); border: 1px solid var(--border-gold);" />
+                      </div>
+                    </td>
+                    <td>
+                      <button type="button" class="btn btn-secondary btn-save-single-city" data-city="${city}" style="padding: 0.35rem 0.8rem; font-size: 0.78rem;">
+                        💾 Save Rate
+                      </button>
+                    </td>
+                  </tr>
+                `;
+              }).join('')}
+            </tbody>
+          </table>
+        </form>
+      </div>
+    `;
+  }
+
   if (activeTab === 'coupons') {
     return `
       <div class="admin-table-wrap">
@@ -502,27 +606,24 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
           <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1rem;">
             <span style="font-size: 1.6rem; color: var(--accent-gold);">🚚</span>
             <div>
-              <h3 style="color: var(--accent-gold); font-size: 1.15rem; font-weight: 800;">127+ Pakistani Cities & Additional Product Shipping Calculator Rules</h3>
-              <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0;">Configure base location delivery charges and fee per extra item added to cart</p>
+              <h3 style="color: var(--accent-gold); font-size: 1.15rem; font-weight: 800;">Additional Product Shipping Fee Settings</h3>
+              <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0;">Configure extra item fee added to customer cart when purchasing multiple products</p>
             </div>
           </div>
 
           <form id="shipping-rules-form">
             <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
               <div class="form-group">
-                <label class="form-label">Major Metro Cities Base Fee (PKR) *</label>
+                <label class="form-label">Major Metro Base Fee (PKR) *</label>
                 <input type="number" name="baseMetroFee" value="${ship.baseMetroFee}" class="form-input" required />
-                <span style="font-size: 0.72rem; color: var(--text-muted);">Lahore, Karachi, Islamabad, etc.</span>
               </div>
               <div class="form-group">
-                <label class="form-label">All Other Cities Base Fee (PKR) *</label>
+                <label class="form-label">Other Cities Base Fee (PKR) *</label>
                 <input type="number" name="baseOtherFee" value="${ship.baseOtherFee}" class="form-input" required />
-                <span style="font-size: 0.72rem; color: var(--text-muted);">Regional & Tier-2 cities</span>
               </div>
               <div class="form-group">
                 <label class="form-label">Additional Product Fee (PKR) *</label>
                 <input type="number" name="additionalItemFee" value="${ship.additionalItemFee}" class="form-input" required />
-                <span style="font-size: 0.72rem; color: var(--text-muted);">Fee per extra product (e.g. 50 PKR)</span>
               </div>
             </div>
             <button type="submit" class="btn btn-primary" style="padding: 0.6rem 1.2rem; font-size: 0.85rem;">
@@ -596,19 +697,23 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
   }
 }
 
-function render24HourSVGChart(orders) {
+/**
+ * Calculates and renders TODAY'S LIVE HOURLY SALES GRAPH (00:00 - 23:59)
+ */
+function renderTodayLiveSVGChart(orders) {
   const hourlyData = Array(24).fill(0);
-  const now = Date.now();
-  const oneDayAgo = now - 24 * 3600 * 1000;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const startOfToday = today.getTime();
+  const endOfToday = startOfToday + 24 * 3600 * 1000 - 1;
 
   orders.forEach(order => {
     if (order.status === 'Cancelled') return;
     const orderTime = order.timestamp || (new Date(order.date).getTime());
-    if (orderTime >= oneDayAgo) {
-      const hoursAgo = Math.floor((now - orderTime) / (3600 * 1000));
-      if (hoursAgo >= 0 && hoursAgo < 24) {
-        const hourIndex = 23 - hoursAgo;
-        hourlyData[hourIndex] += order.total;
+    if (orderTime >= startOfToday && orderTime <= endOfToday) {
+      const hour = new Date(orderTime).getHours();
+      if (hour >= 0 && hour < 24) {
+        hourlyData[hour] += order.total;
       }
     }
   });
@@ -625,24 +730,22 @@ function render24HourSVGChart(orders) {
     return `${x},${y}`;
   }).join(' ');
 
-  const currentHour = new Date().getHours();
   const labels = Array(24).fill(0).map((_, idx) => {
-    const hour = (currentHour - (23 - idx) + 24) % 24;
-    return `${hour.toString().padStart(2, '0')}:00`;
+    return `${idx.toString().padStart(2, '0')}:00`;
   });
 
   return `
     <div style="width: 100%; overflow-x: auto;">
       <svg viewBox="0 0 ${chartWidth} ${chartHeight + 35}" style="width: 100%; height: auto; min-width: 600px; background: rgba(0,0,0,0.3); border-radius: var(--radius-sm); border: 1px solid var(--border-light);">
         <defs>
-          <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="var(--accent-gold)" stop-opacity="0.4" />
+          <linearGradient id="todaySalesGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--accent-gold)" stop-opacity="0.45" />
             <stop offset="100%" stop-color="var(--accent-gold)" stop-opacity="0.0" />
           </linearGradient>
         </defs>
 
         <polyline
-          fill="url(#salesGrad)"
+          fill="url(#todaySalesGrad)"
           stroke="none"
           points="${paddingX},${chartHeight - paddingY} ${points} ${chartWidth - paddingX},${chartHeight - paddingY}"
         />
@@ -784,7 +887,6 @@ function attachTableEventListeners(container, state) {
     });
   });
 
-  // Custom Local UI Product Delete Trigger (No Browser Prompt)
   container.querySelectorAll('.btn-delete-product').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = btn.dataset.id;
@@ -842,16 +944,13 @@ function attachTableEventListeners(container, state) {
   });
 }
 
-/**
- * Advanced Product Catalog Modal with Local File Drag-Drop Uploads & Multi-Image Gallery
- */
 function openProductEditModal(container, state) {
   const root = container.querySelector('#admin-product-modal-root');
   if (!root) return;
 
   const isEdit = !!editingProduct;
   const prod = editingProduct || {
-    name: '', model: '', category: 'shoes', price: '', originalPrice: '', stock: 20, color: '', sizes: ['39', '40', '41', '42', '43', '44'], badge: 'BESTSELLER', description: '', features: ''
+    name: '', model: '', category: 'shoes', price: '', originalPrice: '', stock: 20, color: '', sizes: ['39', '40', '41', '42', '43', '44'], badge: 'BESTSELLER', description: ''
   };
 
   if (!uploadedImages || uploadedImages.length === 0) {
@@ -867,7 +966,6 @@ function openProductEditModal(container, state) {
       </h2>
 
       <form id="admin-prod-form">
-        <!-- Section 1: Basic Info -->
         <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-light); padding: 1.2rem; border-radius: var(--radius-sm); margin-bottom: 1.2rem;">
           <h4 style="color: var(--accent-gold); font-size: 0.95rem; margin-bottom: 0.8rem;">1. Product Identity & Category</h4>
           
@@ -901,7 +999,6 @@ function openProductEditModal(container, state) {
           </div>
         </div>
 
-        <!-- Section 2: Pricing & Stock -->
         <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-light); padding: 1.2rem; border-radius: var(--radius-sm); margin-bottom: 1.2rem;">
           <h4 style="color: var(--accent-gold); font-size: 0.95rem; margin-bottom: 0.8rem;">2. Pakistani Pricing & Stock Inventory</h4>
 
@@ -933,14 +1030,12 @@ function openProductEditModal(container, state) {
           </div>
         </div>
 
-        <!-- Section 3: Drag-Drop File Upload & Image Gallery -->
         <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-light); padding: 1.2rem; border-radius: var(--radius-sm); margin-bottom: 1.2rem;">
           <h4 style="color: var(--accent-gold); font-size: 0.95rem; margin-bottom: 0.8rem;">
             📸 Product Multi-Image Upload & URL Gallery (Up to 4 Images)
           </h4>
 
           <div style="display: flex; flex-direction: column; gap: 0.8rem;">
-            <!-- File Drag and Drop Box -->
             <label class="file-upload-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; padding: 1.2rem; background: var(--bg-primary); border: 2px dashed var(--border-gold); border-radius: 8px; cursor: pointer;">
               <span style="font-size: 1.8rem; color: var(--accent-gold);">📁</span>
               <strong style="color: #fff; font-size: 0.88rem;">Click to Upload Local Image Files or Drag-and-Drop</strong>
@@ -948,7 +1043,6 @@ function openProductEditModal(container, state) {
               <input type="file" id="local-image-file-input" accept="image/*" multiple style="display: none;" />
             </label>
 
-            <!-- Image URL Input -->
             <div style="display: flex; gap: 0.6rem;">
               <input type="url" id="input-add-image-url" class="form-input" placeholder="Or paste external image URL (e.g. https://images.unsplash.com/...)" />
               <button type="button" id="btn-add-image-url-trigger" class="btn btn-secondary" style="font-size: 0.82rem; padding: 0.5rem 1rem; white-space: nowrap;">
@@ -956,14 +1050,12 @@ function openProductEditModal(container, state) {
               </button>
             </div>
 
-            <!-- Uploaded Thumbnails Preview Grid -->
             <div id="product-images-preview-tray" style="display: flex; gap: 0.8rem; flex-wrap: wrap; margin-top: 0.6rem;">
               <!-- Dynamic Previews Injected Here -->
             </div>
           </div>
         </div>
 
-        <!-- Section 4: Sizes & Details -->
         <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-light); padding: 1.2rem; border-radius: var(--radius-sm); margin-bottom: 1.2rem;">
           <h4 style="color: var(--accent-gold); font-size: 0.95rem; margin-bottom: 0.8rem;">4. Sizes Checklist & Product Specifications</h4>
 
@@ -991,7 +1083,6 @@ function openProductEditModal(container, state) {
   root.querySelector('#btn-close-prod-modal')?.addEventListener('click', () => root.classList.remove('active'));
   root.querySelector('#btn-cancel-prod-modal')?.addEventListener('click', () => root.classList.remove('active'));
 
-  // Render Image Thumbnails
   const previewTray = root.querySelector('#product-images-preview-tray');
   function updateImagePreviews() {
     if (!previewTray) return;
@@ -1013,7 +1104,6 @@ function openProductEditModal(container, state) {
 
   updateImagePreviews();
 
-  // Local File Input Listener
   const fileInput = root.querySelector('#local-image-file-input');
   fileInput?.addEventListener('change', (e) => {
     const files = Array.from(e.target.files);
@@ -1027,7 +1117,6 @@ function openProductEditModal(container, state) {
     });
   });
 
-  // URL Add Trigger
   const urlInput = root.querySelector('#input-add-image-url');
   root.querySelector('#btn-add-image-url-trigger')?.addEventListener('click', () => {
     const url = urlInput.value.trim();
@@ -1038,7 +1127,6 @@ function openProductEditModal(container, state) {
     }
   });
 
-  // Save Product Form
   const form = root.querySelector('#admin-prod-form');
   form?.addEventListener('submit', (e) => {
     e.preventDefault();

@@ -4,8 +4,10 @@
  */
 
 import { initialProducts } from '../data/products.js';
+import { initialCityRates } from '../data/pakistanCities.js';
 
 class AppStore {
+
   constructor() {
     this.subscribers = [];
     
@@ -84,6 +86,10 @@ class AppStore {
         baseOtherFee: 250,
         additionalItemFee: 50
       }),
+
+      // City-by-City Specific Custom Rates Dictionary for 127+ Pakistani Cities
+      cityShippingRates: this.loadStorage('kreid_city_shipping_rates', initialCityRates),
+
 
       whatsappConfig: this.loadStorage('kreid_wa_config', {
         primaryProvider: "Easypanel OpenWA Gateway",
@@ -755,14 +761,33 @@ class AppStore {
     this.notify();
   }
 
+  saveCityShippingRate(cityName, ratePkr) {
+    if (!this.state.cityShippingRates) this.state.cityShippingRates = {};
+    this.state.cityShippingRates[cityName] = parseFloat(ratePkr) || 250;
+    this.saveStorage('kreid_city_shipping_rates', this.state.cityShippingRates);
+    this.showToast(`Delivery rate for ${cityName} updated to PKR ${ratePkr}!`, 'success');
+    this.notify();
+  }
+
+  saveAllCityShippingRates(ratesMap) {
+    this.state.cityShippingRates = { ...this.state.cityShippingRates, ...ratesMap };
+    this.saveStorage('kreid_city_shipping_rates', this.state.cityShippingRates);
+    this.showToast('Alhamdulillah! All 127 Pakistani city delivery rates saved!', 'success');
+    this.notify();
+  }
+
   calculateShippingFee(city = 'Lahore', totalItemQty = 1) {
-    const { baseMetroFee, baseOtherFee, additionalItemFee } = this.state.shippingConfig;
+    const { baseMetroFee, baseOtherFee, additionalItemFee } = this.state.shippingConfig || { baseMetroFee: 150, baseOtherFee: 250, additionalItemFee: 50 };
     const majorMetros = ["Lahore", "Karachi", "Islamabad", "Rawalpindi", "Faisalabad", "Peshawar", "Multan", "Quetta", "Sialkot", "Gujranwala", "Hyderabad", "Bahawalpur"];
-    
     const isMetro = majorMetros.includes(city);
-    const baseFee = isMetro ? baseMetroFee : baseOtherFee;
+
+    // Read exact city-by-city rate configured by admin
+    let baseFee = (this.state.cityShippingRates && this.state.cityShippingRates[city] !== undefined)
+      ? this.state.cityShippingRates[city]
+      : (isMetro ? baseMetroFee : baseOtherFee);
+
     const extraItems = Math.max(0, totalItemQty - 1);
-    const extraFee = extraItems * additionalItemFee;
+    const extraFee = extraItems * (additionalItemFee || 50);
     const totalShippingFee = baseFee + extraFee;
 
     return {
@@ -773,6 +798,7 @@ class AppStore {
       totalShippingFee
     };
   }
+
 
   // Toast System
   showToast(message, type = 'info') {

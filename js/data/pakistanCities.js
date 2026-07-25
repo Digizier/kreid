@@ -146,3 +146,18 @@ export const allPakistanCities = [
   "Zhob",
   "Ziarat"
 ];
+
+export const initialCityRates = allPakistanCities.reduce((acc, city) => {
+  if (["Lahore", "Karachi", "Islamabad", "Rawalpindi"].includes(city)) {
+    acc[city] = 150;
+  } else if (["Faisalabad", "Peshawar", "Multan", "Sialkot", "Gujranwala", "Hyderabad"].includes(city)) {
+    acc[city] = 180;
+  } else if (["Quetta", "Bahawalpur", "Sukkur", "Larkana"].includes(city)) {
+    acc[city] = 220;
+  } else if (["Gwadar", "Hunza", "Skardu", "Chitral"].includes(city)) {
+    acc[city] = 350;
+  } else {
+    acc[city] = 250;
+  }
+  return acc;
+}, {});
