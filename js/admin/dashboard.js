@@ -1,16 +1,23 @@
 /**
  * KREID Administrative Control Suite Dashboard
- * Integrated 24-hour live sales graph, live storefront order sync, WhatsApp Automation & Dual-Gateway Suite, coupon manager, payment gateway account editor, custom retention auto-purge engine & "DELETE" confirmation wipe modal.
+ * Featuring Security Authentication Guard (kreid/kreid123@#), Advanced Product Catalog Editor with Local File Drag-Drop Uploads, Location & Additional Item Shipping Engine Settings, and High-Contrast Local UI Confirmation Modals.
  */
 
 import { appStore } from '../store/appStore.js';
 import { renderWhatsAppManager } from './whatsappManager.js';
+import { majorMetroCities, allPakistanCities } from '../data/pakistanCities.js';
 
 let activeTab = 'dashboard'; // 'dashboard' | 'products' | 'orders' | 'coupons' | 'whatsapp' | 'settings'
 let editingProduct = null;
 let uploadedImages = [];
 
 export function renderAdminDashboard(container, state) {
+  // Security Guard: Check Admin Authentication
+  if (!state.isAdminAuthenticated) {
+    renderAdminLoginScreen(container);
+    return;
+  }
+
   const validOrders = state.orders.filter(o => o.status !== 'Cancelled');
   const totalRevenue = validOrders.reduce((sum, o) => sum + o.total, 0);
   const totalOrders = state.orders.length;
@@ -45,12 +52,15 @@ export function renderAdminDashboard(container, state) {
             🎟️ Discount Coupons (${state.coupons.length})
           </div>
           <div class="menu-item ${activeTab === 'settings' ? 'active' : ''}" data-tab="settings">
-            ⚙️ Gateway & Logistics
+            ⚙️ Gateway & Shipping Rules
           </div>
         </nav>
 
-        <div style="margin-top: auto; padding-top: 1.5rem; border-top: 1px solid var(--border-light);">
-          <button class="btn btn-outline-gold" id="btn-admin-go-store" style="width: 100%; font-size: 0.8rem;">
+        <div style="margin-top: auto; padding-top: 1.5rem; border-top: 1px solid var(--border-light); display: flex; flex-direction: column; gap: 0.6rem;">
+          <button class="btn btn-outline-gold" id="btn-admin-logout" style="width: 100%; font-size: 0.8rem; border-color: rgba(230,57,70,0.5); color: var(--accent-neon);">
+            🔒 Logout Admin Session
+          </button>
+          <button class="btn btn-secondary" id="btn-admin-go-store" style="width: 100%; font-size: 0.8rem;">
             🛍️ Return to Storefront
           </button>
         </div>
@@ -63,10 +73,10 @@ export function renderAdminDashboard(container, state) {
           <div>
             <h1 class="admin-page-title">
               ${activeTab === 'dashboard' ? 'Executive Overview & 24hr Hourly Live Analytics' :
-                activeTab === 'products' ? 'Product Inventory Manager' :
+                activeTab === 'products' ? 'Advanced Product Catalog Manager' :
                 activeTab === 'orders' ? 'Order Fulfillment & Payment Proof Inspector' :
                 activeTab === 'whatsapp' ? 'WhatsApp Automation & Dual-Gateway Suite' :
-                activeTab === 'coupons' ? 'Promotions & Coupons Engine' : 'Payment Accounts & Logistics Settings'}
+                activeTab === 'coupons' ? 'Promotions & Coupons Engine' : 'City Shipping Rules & Payment Accounts'}
             </h1>
             <p style="color: var(--text-muted); font-size: 0.85rem;">
               Connected Live to KREID Storefront Data Engine
@@ -76,11 +86,11 @@ export function renderAdminDashboard(container, state) {
           <div style="display: flex; gap: 0.8rem; align-items: center;">
             ${activeTab === 'products' ? `
               <button class="btn btn-primary" id="btn-open-add-product-modal">
-                + Add New Product
+                + Add Advanced SKU Product
               </button>
             ` : ''}
             ${activeTab === 'orders' ? `
-              <button class="btn" id="btn-trigger-wipe-orders" style="background: rgba(230, 57, 70, 0.15); border: 1.5px solid var(--accent-neon); color: var(--accent-neon); font-weight: 800; padding: 0.6rem 1.1rem; border-radius: var(--radius-sm); cursor: pointer; transition: all 0.25s ease; box-shadow: 0 0 15px rgba(230,57,70,0.25);">
+              <button class="btn" id="btn-trigger-wipe-orders" style="background: rgba(230, 57, 70, 0.15); border: 1.5px solid var(--accent-neon); color: var(--accent-neon); font-weight: 800; padding: 0.6rem 1.1rem; border-radius: var(--radius-sm); cursor: pointer;">
                 🗑️ WIPE ALL ORDERS DATA
               </button>
             ` : ''}
@@ -105,15 +115,15 @@ export function renderAdminDashboard(container, state) {
     <div id="admin-coupon-modal-root" class="modal-overlay"></div>
     <div id="admin-order-modal-root" class="modal-overlay"></div>
     <div id="admin-proof-modal-root" class="modal-overlay"></div>
+    <div id="admin-delete-confirm-modal-root" class="modal-overlay"></div>
   `;
 
-  // Render WhatsApp Sub Tab if active
   if (activeTab === 'whatsapp') {
     const waContainer = container.querySelector('#whatsapp-tab-container');
     if (waContainer) renderWhatsAppManager(waContainer, state);
   }
 
-  // Attach Sidebar Tab Listeners
+  // Attach Sidebar Listeners & Logout
   const menuItems = container.querySelectorAll('.menu-item');
   menuItems.forEach(item => {
     item.addEventListener('click', () => {
@@ -122,20 +132,23 @@ export function renderAdminDashboard(container, state) {
     });
   });
 
-  // Return to Storefront
+  container.querySelector('#btn-admin-logout')?.addEventListener('click', () => {
+    appStore.logoutAdmin();
+  });
+
   container.querySelector('#btn-admin-go-store')?.addEventListener('click', () => {
     window.location.hash = '';
     appStore.setView('storefront');
   });
 
-  // Add Product Button Trigger
+  // Product Add Trigger
   container.querySelector('#btn-open-add-product-modal')?.addEventListener('click', () => {
     editingProduct = null;
     uploadedImages = [];
     openProductEditModal(container, state);
   });
 
-  // Trigger Wipe Orders Confirmation Modal
+  // Wipe Orders Confirmation Modal Trigger
   const wipeOrdersTrigger = container.querySelector('#btn-trigger-wipe-orders');
   const wipeOrdersOverlay = container.querySelector('#wipe-orders-confirm-modal-overlay');
   const confirmWipeInput = container.querySelector('#input-confirm-wipe-orders-text');
@@ -195,13 +208,83 @@ export function renderAdminDashboard(container, state) {
     renderAdminDashboard(container, appStore.state);
   });
 
-  // Add Coupon Button Trigger
+  // Coupon Add Trigger
   container.querySelector('#btn-open-add-coupon-modal')?.addEventListener('click', () => {
     openCouponModal(container, state);
   });
 
-  // Attach Table Action Listeners (Edit Product, Delete Product, Update Status, Payment Proof Modal)
+  // Save Shipping Rules Form
+  const shippingForm = container.querySelector('#shipping-rules-form');
+  shippingForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const fd = new FormData(shippingForm);
+    appStore.saveShippingConfig({
+      baseMetroFee: parseFloat(fd.get('baseMetroFee')) || 150,
+      baseOtherFee: parseFloat(fd.get('baseOtherFee')) || 250,
+      additionalItemFee: parseFloat(fd.get('additionalItemFee')) || 50
+    });
+    renderAdminDashboard(container, appStore.state);
+  });
+
   attachTableEventListeners(container, state);
+}
+
+/**
+ * High-Contrast Admin Security Login Screen Component
+ */
+function renderAdminLoginScreen(container) {
+  container.innerHTML = `
+    <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: var(--bg-primary); padding: 1.5rem;">
+      <div style="background: var(--bg-card); border: 2px solid var(--accent-gold); border-radius: var(--radius-md); width: 100%; max-width: 440px; padding: 2.5rem; box-shadow: 0 30px 80px rgba(0,0,0,0.9); position: relative;">
+        
+        <div style="text-align: center; margin-bottom: 2rem;">
+          <img src="assets/kreid-logo.svg" alt="KREID COUTURE" style="height: 60px; margin-bottom: 0.8rem;" />
+          <h2 style="font-size: 1.5rem; color: #ffffff; margin-bottom: 0.3rem;">ADMIN CONTROL SUITE</h2>
+          <p style="font-size: 0.82rem; color: var(--text-muted);">Enter admin authentication credentials to unlock dashboard</p>
+        </div>
+
+        <form id="admin-login-form">
+          <div class="form-group">
+            <label class="form-label" style="color: var(--accent-gold); font-weight: 700;">Admin Username *</label>
+            <input type="text" name="username" required placeholder="e.g. kreid" class="form-input" style="padding: 0.8rem; font-size: 1rem; border-color: var(--border-gold);" value="kreid" />
+          </div>
+
+          <div class="form-group" style="margin-bottom: 1.8rem;">
+            <label class="form-label" style="color: var(--accent-gold); font-weight: 700;">Admin Security Password *</label>
+            <input type="password" name="password" required placeholder="••••••••" class="form-input" style="padding: 0.8rem; font-size: 1rem; border-color: var(--border-gold);" value="kreid123@#" />
+          </div>
+
+          <button type="submit" class="btn btn-primary" style="width: 100%; padding: 1rem; font-size: 1rem; font-weight: 800;">
+            🔒 Authenticate & Unlock Admin Dashboard
+          </button>
+        </form>
+
+        <div style="margin-top: 1.5rem; text-align: center;">
+          <button class="btn btn-secondary" id="btn-login-go-store" style="font-size: 0.82rem; padding: 0.5rem 1rem;">
+            🛍️ Return to Customer Storefront
+          </button>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  const form = container.querySelector('#admin-login-form');
+  form?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const user = fd.get('username').trim();
+    const pass = fd.get('password').trim();
+
+    if (appStore.loginAdmin(user, pass)) {
+      renderAdminDashboard(container, appStore.state);
+    }
+  });
+
+  container.querySelector('#btn-login-go-store')?.addEventListener('click', () => {
+    window.location.hash = '';
+    appStore.setView('storefront');
+  });
 }
 
 function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowStockCount) {
@@ -242,7 +325,7 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
         </div>
       </div>
 
-      <!-- Real Dynamic 24-Hour (1h to 24h) Hourly Sales Graph -->
+      <!-- 24-Hour Sales Performance SVG -->
       <div class="chart-container">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
           <div>
@@ -268,11 +351,11 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
           <thead>
             <tr>
               <th>Image</th>
-              <th>Product Name</th>
+              <th>Product Details</th>
               <th>Category</th>
               <th>Price (PKR)</th>
               <th>Stock</th>
-              <th>Status</th>
+              <th>Badge</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -284,15 +367,16 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
                 </td>
                 <td>
                   <strong style="color: #ffffff; font-size: 0.95rem;">${p.name}</strong>
-                  <div style="font-size: 0.75rem; color: var(--text-muted);">SKU: ${p.id} | Model: ${p.model || 'N/A'}</div>
+                  <div style="font-size: 0.75rem; color: var(--text-muted);">Model: ${p.model || 'N/A'} | Color: ${p.color || 'N/A'} | Sizes: ${p.sizes ? p.sizes.join(', ') : 'N/A'}</div>
                 </td>
-                <td><span class="badge badge-gold">${p.category}</span></td>
-                <td><strong>PKR ${p.price.toLocaleString()}</strong></td>
+                <td><span class="badge badge-gold">${p.category.toUpperCase()}</span></td>
+                <td>
+                  <strong style="color: var(--accent-gold); font-size: 1rem;">PKR ${p.price.toLocaleString()}</strong>
+                  ${p.originalPrice ? `<div style="font-size: 0.72rem; color: var(--text-muted); text-decoration: line-through;">PKR ${p.originalPrice.toLocaleString()}</div>` : ''}
+                </td>
                 <td><strong>${p.stock}</strong></td>
                 <td>
-                  <span class="status-pill ${p.stock > 10 ? 'instock' : p.stock > 0 ? 'processing' : 'lowstock'}">
-                    ${p.stock > 10 ? 'In Stock' : p.stock > 0 ? 'Low Stock' : 'Out of Stock'}
-                  </span>
+                  <span class="badge badge-green">${p.badge || 'HOT'}</span>
                 </td>
                 <td>
                   <button class="btn btn-secondary btn-edit-product" data-id="${p.id}" style="padding: 0.4rem 0.8rem; font-size: 0.78rem;">
@@ -409,8 +493,44 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
 
   if (activeTab === 'settings') {
     const pay = state.paymentSettings;
+    const ship = state.shippingConfig || { baseMetroFee: 150, baseOtherFee: 250, additionalItemFee: 50 };
     return `
-      <div style="max-width: 800px; display: flex; flex-direction: column; gap: 1.5rem;">
+      <div style="max-width: 850px; display: flex; flex-direction: column; gap: 1.5rem;">
+        
+        <!-- Location & Weight Shipping Rules Form -->
+        <div style="background: var(--bg-card); border: 1.5px solid var(--accent-gold); border-radius: var(--radius-md); padding: 1.5rem;">
+          <div style="display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1rem;">
+            <span style="font-size: 1.6rem; color: var(--accent-gold);">🚚</span>
+            <div>
+              <h3 style="color: var(--accent-gold); font-size: 1.15rem; font-weight: 800;">127+ Pakistani Cities & Additional Product Shipping Calculator Rules</h3>
+              <p style="font-size: 0.82rem; color: var(--text-muted); margin: 0;">Configure base location delivery charges and fee per extra item added to cart</p>
+            </div>
+          </div>
+
+          <form id="shipping-rules-form">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+              <div class="form-group">
+                <label class="form-label">Major Metro Cities Base Fee (PKR) *</label>
+                <input type="number" name="baseMetroFee" value="${ship.baseMetroFee}" class="form-input" required />
+                <span style="font-size: 0.72rem; color: var(--text-muted);">Lahore, Karachi, Islamabad, etc.</span>
+              </div>
+              <div class="form-group">
+                <label class="form-label">All Other Cities Base Fee (PKR) *</label>
+                <input type="number" name="baseOtherFee" value="${ship.baseOtherFee}" class="form-input" required />
+                <span style="font-size: 0.72rem; color: var(--text-muted);">Regional & Tier-2 cities</span>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Additional Product Fee (PKR) *</label>
+                <input type="number" name="additionalItemFee" value="${ship.additionalItemFee}" class="form-input" required />
+                <span style="font-size: 0.72rem; color: var(--text-muted);">Fee per extra product (e.g. 50 PKR)</span>
+              </div>
+            </div>
+            <button type="submit" class="btn btn-primary" style="padding: 0.6rem 1.2rem; font-size: 0.85rem;">
+              💾 Save Shipping Calculator Rules
+            </button>
+          </form>
+        </div>
+
         <div style="background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.5rem;">
           <h3 style="color: var(--accent-gold); font-size: 1.1rem; margin-bottom: 1rem;">📱 JazzCash Account Settings</h3>
           <form id="jazzcash-settings-form">
@@ -476,9 +596,6 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
   }
 }
 
-/**
- * Renders SVG 24-Hour (1h to 24h) Hourly Sales Performance Line Chart
- */
 function render24HourSVGChart(orders) {
   const hourlyData = Array(24).fill(0);
   const now = Date.now();
@@ -633,7 +750,6 @@ function renderOrdersTable(orders) {
 }
 
 function attachTableEventListeners(container, state) {
-  // Update Order Status
   container.querySelectorAll('.order-status-select').forEach(select => {
     select.addEventListener('change', (e) => {
       const orderId = select.dataset.id;
@@ -642,7 +758,6 @@ function attachTableEventListeners(container, state) {
     });
   });
 
-  // View Payment Proof Modal
   container.querySelectorAll('.btn-view-proof').forEach(btn => {
     btn.addEventListener('click', () => {
       const proofSrc = btn.dataset.proof;
@@ -669,18 +784,38 @@ function attachTableEventListeners(container, state) {
     });
   });
 
-  // Delete Product Trigger
+  // Custom Local UI Product Delete Trigger (No Browser Prompt)
   container.querySelectorAll('.btn-delete-product').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = btn.dataset.id;
-      if (confirm(`Are you sure you want to delete product SKU: ${id}?`)) {
-        appStore.deleteProduct(id);
-        renderAdminDashboard(container, appStore.state);
+      const targetProd = state.products.find(p => p.id === id);
+      const deleteModalRoot = container.querySelector('#admin-delete-confirm-modal-root');
+      if (deleteModalRoot && targetProd) {
+        deleteModalRoot.classList.add('active');
+        deleteModalRoot.innerHTML = `
+          <div class="modal-card" style="max-width: 480px; padding: 2rem; background: var(--bg-card); border: 2px solid var(--accent-neon); border-radius: var(--radius-md); text-align: center;">
+            <div style="font-size: 2.5rem; color: var(--accent-neon); margin-bottom: 0.4rem;">🗑️</div>
+            <h3 style="color: #ffffff; font-size: 1.25rem; font-weight: 800; margin-bottom: 0.5rem;">DELETE CATALOG PRODUCT SKU?</h3>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.2rem;">
+              Are you sure you want to permanently delete <strong>"${targetProd.name}"</strong> (SKU: ${id})?
+            </p>
+            <div style="display: flex; gap: 0.8rem;">
+              <button class="btn btn-secondary" id="btn-cancel-delete-prod" style="flex: 1;">Cancel</button>
+              <button class="btn" id="btn-confirm-delete-prod" style="flex: 1; background: var(--accent-neon); color: #fff; font-weight: 800; border: none;">Confirm Delete</button>
+            </div>
+          </div>
+        `;
+
+        deleteModalRoot.querySelector('#btn-cancel-delete-prod')?.addEventListener('click', () => deleteModalRoot.classList.remove('active'));
+        deleteModalRoot.querySelector('#btn-confirm-delete-prod')?.addEventListener('click', () => {
+          appStore.deleteProduct(id);
+          deleteModalRoot.classList.remove('active');
+          renderAdminDashboard(container, appStore.state);
+        });
       }
     });
   });
 
-  // Edit Product Trigger
   container.querySelectorAll('.btn-edit-product').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = btn.dataset.id;
@@ -690,7 +825,6 @@ function attachTableEventListeners(container, state) {
     });
   });
 
-  // Toggle & Delete Coupons
   container.querySelectorAll('.btn-toggle-coupon').forEach(btn => {
     btn.addEventListener('click', () => {
       appStore.toggleCoupon(btn.dataset.code);
@@ -708,64 +842,147 @@ function attachTableEventListeners(container, state) {
   });
 }
 
+/**
+ * Advanced Product Catalog Modal with Local File Drag-Drop Uploads & Multi-Image Gallery
+ */
 function openProductEditModal(container, state) {
   const root = container.querySelector('#admin-product-modal-root');
   if (!root) return;
 
   const isEdit = !!editingProduct;
   const prod = editingProduct || {
-    name: '', category: 'shoes', price: '', originalPrice: '', stock: 20, color: '', sizes: ['M', 'L'], description: ''
+    name: '', model: '', category: 'shoes', price: '', originalPrice: '', stock: 20, color: '', sizes: ['39', '40', '41', '42', '43', '44'], badge: 'BESTSELLER', description: '', features: ''
   };
+
+  if (!uploadedImages || uploadedImages.length === 0) {
+    uploadedImages = prod.images ? [...prod.images] : ['https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=800&q=80'];
+  }
 
   root.classList.add('active');
   root.innerHTML = `
-    <div class="modal-card" style="max-width: 650px; padding: 2rem; background: var(--bg-card); border: 1.5px solid var(--accent-gold); border-radius: var(--radius-md);">
+    <div class="modal-card" style="max-width: 780px; padding: 2rem; background: var(--bg-card); border: 1.5px solid var(--accent-gold); border-radius: var(--radius-md); max-height: 90vh; overflow-y: auto;">
       <button class="modal-close-btn" id="btn-close-prod-modal">✕</button>
-      <h2 style="font-size: 1.4rem; color: var(--accent-gold); margin-bottom: 1.5rem;">
-        ${isEdit ? '✏️ Edit Catalog Item' : '➕ Add New SKU Product'}
+      <h2 style="font-size: 1.4rem; color: var(--accent-gold); margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.6rem;">
+        ${isEdit ? '✏️ Edit Advanced Catalog Product' : '➕ Create New Advanced SKU Item'}
       </h2>
 
       <form id="admin-prod-form">
-        <div class="form-group">
-          <label class="form-label">Product Name *</label>
-          <input type="text" name="name" value="${prod.name}" required class="form-input" placeholder="e.g. Nike Air Jordan 1 Low" />
-        </div>
+        <!-- Section 1: Basic Info -->
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-light); padding: 1.2rem; border-radius: var(--radius-sm); margin-bottom: 1.2rem;">
+          <h4 style="color: var(--accent-gold); font-size: 0.95rem; margin-bottom: 0.8rem;">1. Product Identity & Category</h4>
+          
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+            <div class="form-group">
+              <label class="form-label">Product Name *</label>
+              <input type="text" name="name" value="${prod.name}" required class="form-input" placeholder="e.g. Nike Air Jordan 1 Low – White/Wheat Black" />
+            </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
-          <div class="form-group">
-            <label class="form-label">Category *</label>
-            <select name="category" class="form-select">
-              <option value="shoes" ${prod.category === 'shoes' ? 'selected' : ''}>Shoes</option>
-              <option value="tshirts" ${prod.category === 'tshirts' ? 'selected' : ''}>T-Shirts</option>
-              <option value="trousers" ${prod.category === 'trousers' ? 'selected' : ''}>Trousers</option>
-              <option value="pants" ${prod.category === 'pants' ? 'selected' : ''}>Pants</option>
-            </select>
+            <div class="form-group">
+              <label class="form-label">Category *</label>
+              <select name="category" id="modal-category-select" class="form-select">
+                <option value="shoes" ${prod.category === 'shoes' ? 'selected' : ''}>Shoes</option>
+                <option value="tshirts" ${prod.category === 'tshirts' ? 'selected' : ''}>T-Shirts</option>
+                <option value="trousers" ${prod.category === 'trousers' ? 'selected' : ''}>Trousers</option>
+                <option value="pants" ${prod.category === 'pants' ? 'selected' : ''}>Pants</option>
+              </select>
+            </div>
           </div>
 
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <label class="form-label">Model Name / Line</label>
+              <input type="text" name="model" value="${prod.model || ''}" class="form-input" placeholder="e.g. Air Jordan 1 Low" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Primary Color Variant</label>
+              <input type="text" name="color" value="${prod.color || ''}" class="form-input" placeholder="e.g. White / Wheat Brown / Black" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Pricing & Stock -->
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-light); padding: 1.2rem; border-radius: var(--radius-sm); margin-bottom: 1.2rem;">
+          <h4 style="color: var(--accent-gold); font-size: 0.95rem; margin-bottom: 0.8rem;">2. Pakistani Pricing & Stock Inventory</h4>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+              <label class="form-label">Discount Price (PKR) *</label>
+              <input type="number" name="price" value="${prod.price}" required class="form-input" placeholder="e.g. 3500" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Original Price (PKR)</label>
+              <input type="number" name="originalPrice" value="${prod.originalPrice || ''}" class="form-input" placeholder="e.g. 4500" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Inventory Qty *</label>
+              <input type="number" name="stock" value="${prod.stock}" required class="form-input" />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Tag Badge</label>
+              <select name="badge" class="form-select">
+                <option value="BESTSELLER" ${prod.badge === 'BESTSELLER' ? 'selected' : ''}>BESTSELLER</option>
+                <option value="HOT ITEM" ${prod.badge === 'HOT ITEM' ? 'selected' : ''}>HOT ITEM</option>
+                <option value="EXCLUSIVE" ${prod.badge === 'EXCLUSIVE' ? 'selected' : ''}>EXCLUSIVE</option>
+                <option value="LIMITED" ${prod.badge === 'LIMITED' ? 'selected' : ''}>LIMITED</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Drag-Drop File Upload & Image Gallery -->
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-light); padding: 1.2rem; border-radius: var(--radius-sm); margin-bottom: 1.2rem;">
+          <h4 style="color: var(--accent-gold); font-size: 0.95rem; margin-bottom: 0.8rem;">
+            📸 Product Multi-Image Upload & URL Gallery (Up to 4 Images)
+          </h4>
+
+          <div style="display: flex; flex-direction: column; gap: 0.8rem;">
+            <!-- File Drag and Drop Box -->
+            <label class="file-upload-box" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; padding: 1.2rem; background: var(--bg-primary); border: 2px dashed var(--border-gold); border-radius: 8px; cursor: pointer;">
+              <span style="font-size: 1.8rem; color: var(--accent-gold);">📁</span>
+              <strong style="color: #fff; font-size: 0.88rem;">Click to Upload Local Image Files or Drag-and-Drop</strong>
+              <span style="font-size: 0.75rem; color: var(--text-muted);">Supports PNG, JPG, WEBP format</span>
+              <input type="file" id="local-image-file-input" accept="image/*" multiple style="display: none;" />
+            </label>
+
+            <!-- Image URL Input -->
+            <div style="display: flex; gap: 0.6rem;">
+              <input type="url" id="input-add-image-url" class="form-input" placeholder="Or paste external image URL (e.g. https://images.unsplash.com/...)" />
+              <button type="button" id="btn-add-image-url-trigger" class="btn btn-secondary" style="font-size: 0.82rem; padding: 0.5rem 1rem; white-space: nowrap;">
+                + Add Image URL
+              </button>
+            </div>
+
+            <!-- Uploaded Thumbnails Preview Grid -->
+            <div id="product-images-preview-tray" style="display: flex; gap: 0.8rem; flex-wrap: wrap; margin-top: 0.6rem;">
+              <!-- Dynamic Previews Injected Here -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 4: Sizes & Details -->
+        <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-light); padding: 1.2rem; border-radius: var(--radius-sm); margin-bottom: 1.2rem;">
+          <h4 style="color: var(--accent-gold); font-size: 0.95rem; margin-bottom: 0.8rem;">4. Sizes Checklist & Product Specifications</h4>
+
           <div class="form-group">
-            <label class="form-label">Price (PKR) *</label>
-            <input type="number" name="price" value="${prod.price}" required class="form-input" />
+            <label class="form-label">Available Sizes (Comma Separated)</label>
+            <input type="text" name="sizes" value="${prod.sizes ? prod.sizes.join(', ') : '39, 40, 41, 42, 43, 44'}" class="form-input" placeholder="e.g. 39, 40, 41, 42, 43, 44 OR S, M, L, XL" />
           </div>
 
-          <div class="form-group">
-            <label class="form-label">Stock Qty *</label>
-            <input type="number" name="stock" value="${prod.stock}" required class="form-input" />
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">Detailed Description</label>
+            <textarea name="description" class="form-input" rows="3" placeholder="Write luxury product description...">${prod.description || ''}</textarea>
           </div>
         </div>
 
-        <div class="form-group">
-          <label class="form-label">Main Image URL *</label>
-          <input type="url" name="imageUrl" value="${uploadedImages[0] || ''}" required class="form-input" placeholder="https://images.unsplash.com/..." />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Description</label>
-          <textarea name="description" class="form-input" rows="3">${prod.description || ''}</textarea>
-        </div>
-
-        <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
+        <div style="display: flex; justify-content: flex-end; gap: 1rem;">
           <button type="button" class="btn btn-secondary" id="btn-cancel-prod-modal">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save Product</button>
+          <button type="submit" class="btn btn-primary" style="padding: 0.7rem 1.4rem;">
+            💾 Save Product to Inventory
+          </button>
         </div>
       </form>
     </div>
@@ -774,17 +991,74 @@ function openProductEditModal(container, state) {
   root.querySelector('#btn-close-prod-modal')?.addEventListener('click', () => root.classList.remove('active'));
   root.querySelector('#btn-cancel-prod-modal')?.addEventListener('click', () => root.classList.remove('active'));
 
+  // Render Image Thumbnails
+  const previewTray = root.querySelector('#product-images-preview-tray');
+  function updateImagePreviews() {
+    if (!previewTray) return;
+    previewTray.innerHTML = uploadedImages.map((img, idx) => `
+      <div style="position: relative; width: 85px; height: 85px; border-radius: 6px; overflow: hidden; border: 1.5px solid var(--border-gold);">
+        <img src="${img}" style="width: 100%; height: 100%; object-fit: cover;" />
+        <button type="button" class="btn-remove-img-thumb" data-idx="${idx}" style="position: absolute; top: 2px; right: 2px; background: rgba(230,57,70,0.85); color: #fff; border: none; border-radius: 50%; width: 22px; height: 22px; font-size: 0.7rem; cursor: pointer; display: flex; align-items: center; justify-content: center;">✕</button>
+      </div>
+    `).join('');
+
+    previewTray.querySelectorAll('.btn-remove-img-thumb').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const removeIdx = parseInt(btn.dataset.idx);
+        uploadedImages.splice(removeIdx, 1);
+        updateImagePreviews();
+      });
+    });
+  }
+
+  updateImagePreviews();
+
+  // Local File Input Listener
+  const fileInput = root.querySelector('#local-image-file-input');
+  fileInput?.addEventListener('change', (e) => {
+    const files = Array.from(e.target.files);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        uploadedImages.push(evt.target.result);
+        updateImagePreviews();
+      };
+      reader.readAsDataURL(file);
+    });
+  });
+
+  // URL Add Trigger
+  const urlInput = root.querySelector('#input-add-image-url');
+  root.querySelector('#btn-add-image-url-trigger')?.addEventListener('click', () => {
+    const url = urlInput.value.trim();
+    if (url) {
+      uploadedImages.push(url);
+      urlInput.value = '';
+      updateImagePreviews();
+    }
+  });
+
+  // Save Product Form
   const form = root.querySelector('#admin-prod-form');
   form?.addEventListener('submit', (e) => {
     e.preventDefault();
     const fd = new FormData(form);
+
+    const sizesStr = fd.get('sizes');
+    const sizesArray = sizesStr ? sizesStr.split(',').map(s => s.trim()).filter(Boolean) : ['M', 'L'];
+
     const prodData = {
       id: isEdit ? editingProduct.id : `prod-${Date.now()}`,
       name: fd.get('name'),
+      model: fd.get('model'),
+      color: fd.get('color'),
       category: fd.get('category'),
       price: parseFloat(fd.get('price')),
+      originalPrice: fd.get('originalPrice') ? parseFloat(fd.get('originalPrice')) : null,
       stock: parseInt(fd.get('stock')),
-      images: [fd.get('imageUrl')],
+      badge: fd.get('badge'),
+      images: uploadedImages.length > 0 ? uploadedImages : ['https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=800&q=80'],
+      sizes: sizesArray,
       description: fd.get('description'),
       inStock: parseInt(fd.get('stock')) > 0
     };

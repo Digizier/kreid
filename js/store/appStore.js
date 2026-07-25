@@ -75,7 +75,16 @@ class AppStore {
         sadapay: { title: "KREID COUTURE SADA", number: "0333 4455667" },
         bank: { bankName: "Bank Alfalah Limited", title: "KREID COUTURE SMC PVT LTD", iban: "PK45 BAHL 0001 2345 6789 0123" }
       }),
-      // Live WhatsApp Configuration & Retention
+      // Admin Auth State
+      isAdminAuthenticated: this.loadStorage('kreid_admin_auth', false),
+
+      // Location & Additional Product Shipping Config
+      shippingConfig: this.loadStorage('kreid_shipping_config', {
+        baseMetroFee: 150,
+        baseOtherFee: 250,
+        additionalItemFee: 50
+      }),
+
       whatsappConfig: this.loadStorage('kreid_wa_config', {
         primaryProvider: "Easypanel OpenWA Gateway",
         primaryEndpoint: defaultEndpoint,
@@ -717,8 +726,57 @@ class AppStore {
     this.notify();
   }
 
+  // Admin Authentication Methods
+  loginAdmin(username, password) {
+    if (username === 'kreid' && password === 'kreid123@#') {
+      this.state.isAdminAuthenticated = true;
+      this.saveStorage('kreid_admin_auth', true);
+      this.showToast('Alhamdulillah! Welcome to KREID Admin Suite.', 'success');
+      this.notify();
+      return true;
+    } else {
+      this.showToast('Invalid admin username or password!', 'error');
+      return false;
+    }
+  }
+
+  logoutAdmin() {
+    this.state.isAdminAuthenticated = false;
+    this.saveStorage('kreid_admin_auth', false);
+    this.showToast('Admin session logged out successfully.', 'info');
+    this.notify();
+  }
+
+  // Shipping Engine Calculator
+  saveShippingConfig(newConfig) {
+    this.state.shippingConfig = { ...this.state.shippingConfig, ...newConfig };
+    this.saveStorage('kreid_shipping_config', this.state.shippingConfig);
+    this.showToast('City Location & Additional Product Shipping rules saved!', 'success');
+    this.notify();
+  }
+
+  calculateShippingFee(city = 'Lahore', totalItemQty = 1) {
+    const { baseMetroFee, baseOtherFee, additionalItemFee } = this.state.shippingConfig;
+    const majorMetros = ["Lahore", "Karachi", "Islamabad", "Rawalpindi", "Faisalabad", "Peshawar", "Multan", "Quetta", "Sialkot", "Gujranwala", "Hyderabad", "Bahawalpur"];
+    
+    const isMetro = majorMetros.includes(city);
+    const baseFee = isMetro ? baseMetroFee : baseOtherFee;
+    const extraItems = Math.max(0, totalItemQty - 1);
+    const extraFee = extraItems * additionalItemFee;
+    const totalShippingFee = baseFee + extraFee;
+
+    return {
+      isMetro,
+      baseFee,
+      extraItems,
+      extraFee,
+      totalShippingFee
+    };
+  }
+
   // Toast System
   showToast(message, type = 'info') {
+
     const toast = { id: Date.now(), message, type };
     this.state.toasts.push(toast);
     this.notify();

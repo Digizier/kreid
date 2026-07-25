@@ -4,8 +4,10 @@
  */
 
 import { appStore } from '../store/appStore.js';
+import { majorMetroCities, allPakistanCities } from '../data/pakistanCities.js';
 
 let paymentProofBase64 = null;
+
 let confirmedOrderData = null;
 
 export function renderCheckoutModal(container, state) {
@@ -75,20 +77,29 @@ export function renderCheckoutModal(container, state) {
             </div>
 
             <div class="form-group">
-              <label class="form-label">City *</label>
-              <select name="city" class="form-select" required>
-                <option value="Lahore">Lahore</option>
-                <option value="Karachi">Karachi</option>
-                <option value="Islamabad">Islamabad</option>
-                <option value="Rawalpindi">Rawalpindi</option>
-                <option value="Faisalabad">Faisalabad</option>
-                <option value="Peshawar">Peshawar</option>
-                <option value="Multan">Multan</option>
-                <option value="Quetta">Quetta</option>
-                <option value="Sialkot">Sialkot</option>
+              <label class="form-label">City (127+ Pakistani Cities Available) *</label>
+              <select name="city" id="checkout-city-select" class="form-select" required>
+                <optgroup label="🌟 MAJOR METROPOLITAN CITIES">
+                  ${majorMetroCities.map(c => `<option value="${c}" ${c === 'Lahore' ? 'selected' : ''}>${c}</option>`).join('')}
+                </optgroup>
+                <optgroup label="📍 ALL CITIES (A-Z)">
+                  ${allPakistanCities.map(c => `<option value="${c}">${c}</option>`).join('')}
+                </optgroup>
               </select>
             </div>
           </div>
+
+          <!-- Dynamic Shipping Fee Breakdown Card -->
+          <div id="checkout-shipping-breakdown-card" style="background: rgba(212,175,55,0.06); border: 1px solid var(--border-gold); padding: 0.8rem 1rem; border-radius: var(--radius-sm); margin-top: 1rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+            <div>
+              <div style="font-size: 0.78rem; color: var(--accent-gold); font-weight: 700; text-transform: uppercase;">🚚 Dynamic Pakistani Shipping Rate</div>
+              <div id="checkout-shipping-desc-text" style="font-size: 0.82rem; color: #fff;">Base Delivery (Lahore): PKR 150</div>
+            </div>
+            <div id="checkout-shipping-total-badge" style="font-size: 1.1rem; font-weight: 800; color: var(--accent-gold);">
+              PKR 150
+            </div>
+          </div>
+
 
           <div class="form-group" style="margin-bottom: 0;">
             <label class="form-label">Complete Street Address *</label>
@@ -242,11 +253,38 @@ export function renderCheckoutModal(container, state) {
     }
   }
 
+  const citySelect = container.querySelector('#checkout-city-select');
+  const shippingDesc = container.querySelector('#checkout-shipping-desc-text');
+  const shippingBadge = container.querySelector('#checkout-shipping-total-badge');
+  const payableTotalElem = container.querySelector('#checkout-payable-total-text');
+
+  const cartItemsCount = state.cart.reduce((sum, item) => sum + item.quantity, 0);
+
+  function updateLiveShipping(selectedCity) {
+    const shipping = appStore.calculateShippingFee(selectedCity, cartItemsCount);
+    if (shippingDesc && shippingBadge) {
+      shippingBadge.textContent = `PKR ${shipping.totalShippingFee.toLocaleString()}`;
+      shippingDesc.innerHTML = `Base Shipping (${selectedCity}): PKR ${shipping.baseFee} ${shipping.extraItems > 0 ? `<br/><span style="color: var(--accent-gold);">+ ${shipping.extraItems} Additional Products Fee: +PKR ${shipping.extraFee}</span>` : ''}`;
+    }
+    const cartSubtotal = appStore.getCartTotal();
+    const finalTotal = cartSubtotal + shipping.totalShippingFee;
+    if (payableTotalElem) {
+      payableTotalElem.textContent = `PKR ${finalTotal.toLocaleString()}`;
+    }
+  }
+
+  citySelect?.addEventListener('change', (e) => {
+    updateLiveShipping(e.target.value);
+  });
+
+  if (citySelect) updateLiveShipping(citySelect.value);
+
   form.addEventListener('change', (e) => {
     if (e.target.name === 'paymentMethod') {
       updatePaymentDisplay(e.target.value);
     }
   });
+
 
   const cards = container.querySelectorAll('.pay-option-card');
   cards.forEach(card => {
