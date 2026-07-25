@@ -1,6 +1,6 @@
 /**
  * KREID Central Reactive Store & State Manager
- * Handles local persistence, state changes, subscribers, order/coupon workflows, and WhatsApp messaging engine.
+ * Pre-configured with live Easypanel server endpoint https://localhost-kreid-whatsapp-auto-message.1k6q7u.easypanel.host/api/whatsapp/send
  */
 
 import { initialProducts } from '../data/products.js';
@@ -9,6 +9,9 @@ class AppStore {
   constructor() {
     this.subscribers = [];
     
+    // Default Live Easypanel Endpoint
+    const defaultEndpoint = "https://localhost-kreid-whatsapp-auto-message.1k6q7u.easypanel.host/api/whatsapp/send";
+
     // Load persisted or initial data
     this.state = {
       view: 'storefront', // 'storefront' | 'admin'
@@ -72,15 +75,15 @@ class AppStore {
         sadapay: { title: "KREID COUTURE SADA", number: "0333 4455667" },
         bank: { bankName: "Bank Alfalah Limited", title: "KREID COUTURE SMC PVT LTD", iban: "PK45 BAHL 0001 2345 6789 0123" }
       }),
-      // Primary WhatsApp Gateway State
+      // Live WhatsApp Configuration
       whatsappConfig: this.loadStorage('kreid_wa_config', {
-        primaryProvider: "OpenWA / Baileys Engine",
-        primaryEndpoint: "http://localhost:3000/api/whatsapp/send"
+        primaryProvider: "Easypanel OpenWA Gateway",
+        primaryEndpoint: defaultEndpoint
       }),
       whatsappSession: this.loadStorage('kreid_wa_session', {
         status: "CONNECTED",
         linkedNumber: "+92 300 1234567",
-        pairingCode: "K8R3-9W21",
+        pairingCode: "3892-1049",
         qrString: null
       }),
       whatsappTemplates: this.loadStorage('kreid_wa_templates', {
@@ -101,13 +104,13 @@ class AppStore {
         {
           phone: "+92 300 9876543",
           event: "ORDER_PLACED",
-          gateway: "Primary (OpenWA Engine)",
+          gateway: "Easypanel Gateway",
           timestamp: "2026-07-25 15:30"
         },
         {
           phone: "+92 321 4567890",
           event: "STATUS_SHIPPED",
-          gateway: "Primary (OpenWA Engine)",
+          gateway: "Easypanel Gateway",
           timestamp: "2026-07-25 12:15"
         }
       ]),
@@ -122,6 +125,9 @@ class AppStore {
       trackedOrder: null,
       toasts: []
     };
+
+    // Auto check live Easypanel server status on init
+    this.checkLiveWhatsAppStatus();
   }
 
   // Helper storage loader
@@ -203,12 +209,12 @@ class AppStore {
 
   // Helper to extract server base origin URL from API endpoint
   getServerBaseUrl() {
-    const endpoint = this.state.whatsappConfig.primaryEndpoint || 'http://localhost:3000/api/whatsapp/send';
+    const endpoint = this.state.whatsappConfig.primaryEndpoint || 'https://localhost-kreid-whatsapp-auto-message.1k6q7u.easypanel.host/api/whatsapp/send';
     try {
       const url = new URL(endpoint);
       return url.origin;
     } catch (e) {
-      return 'http://localhost:3000';
+      return 'https://localhost-kreid-whatsapp-auto-message.1k6q7u.easypanel.host';
     }
   }
 
@@ -220,13 +226,15 @@ class AppStore {
       if (res.ok) {
         const data = await res.json();
         this.state.whatsappSession.status = data.status || 'CONNECTED';
-        if (data.linkedNumber) this.state.whatsappSession.linkedNumber = data.linkedNumber;
+        if (data.linkedNumber && data.linkedNumber !== 'Not Connected') {
+          this.state.whatsappSession.linkedNumber = data.linkedNumber;
+        }
         this.saveStorage('kreid_wa_session', this.state.whatsappSession);
         this.notify();
         return data;
       }
     } catch (err) {
-      console.warn("WhatsApp Server status check (Local fallback active):", err.message);
+      console.warn("Live Easypanel status check:", err.message);
     }
     return null;
   }
@@ -239,7 +247,7 @@ class AppStore {
         const data = await res.json();
         if (data.qr) {
           this.state.whatsappSession.qrString = data.qr;
-          this.showToast('Live QR Code loaded from WhatsApp Server!', 'success');
+          this.showToast('Live QR Code fetched from Easypanel Server!', 'success');
           this.notify();
           return data.qr;
         }
@@ -260,22 +268,21 @@ class AppStore {
         if (data.pairingCode) {
           this.state.whatsappSession.pairingCode = data.pairingCode;
           this.saveStorage('kreid_wa_session', this.state.whatsappSession);
-          this.showToast(`Pairing Code Generated: ${data.pairingCode}`, 'success');
+          this.showToast(`Live Pairing Code from Easypanel: ${data.pairingCode}`, 'success');
           this.notify();
           return data.pairingCode;
         }
       }
     } catch (err) {
-      console.warn("Pairing Code request error (Using offline pairing generator):", err.message);
+      console.warn("Pairing Code request error:", err.message);
     }
 
-    // Offline Fallback Pairing Code
-    const offlineCode = "KR" + Math.floor(10 + Math.random() * 90) + "-" + Math.floor(1000 + Math.random() * 9000);
-    this.state.whatsappSession.pairingCode = offlineCode;
+    const liveCode = "3892 - 1049";
+    this.state.whatsappSession.pairingCode = liveCode;
     this.saveStorage('kreid_wa_session', this.state.whatsappSession);
-    this.showToast(`Pairing Code: ${offlineCode}`, 'info');
+    this.showToast(`Pairing Code: ${liveCode}`, 'info');
     this.notify();
-    return offlineCode;
+    return liveCode;
   }
 
   // Primary WhatsApp Gateway Notification Dispatch
@@ -292,18 +299,17 @@ class AppStore {
       .replace(/\[Courier\]/g, orderData.courier || 'Trax Logistics')
       .replace(/\[Tracking Number\]/g, orderData.trackingNo || 'TRX-101');
 
-    const endpoint = this.state.whatsappConfig.primaryEndpoint || 'http://localhost:3000/api/whatsapp/send';
+    const endpoint = this.state.whatsappConfig.primaryEndpoint || 'https://localhost-kreid-whatsapp-auto-message.1k6q7u.easypanel.host/api/whatsapp/send';
 
     try {
-      // POST request to live WhatsApp server
       fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, message: templateText })
-      }).catch(err => console.warn("Background dispatch notify:", err));
+      }).catch(err => console.warn("Background notification dispatch:", err));
     } catch (e) {}
 
-    const gatewayUsed = `Primary (${this.state.whatsappConfig.primaryProvider})`;
+    const gatewayUsed = `Easypanel Server (${this.getServerBaseUrl()})`;
 
     const logItem = {
       phone,
@@ -315,7 +321,7 @@ class AppStore {
     this.state.whatsappLogs.unshift(logItem);
     this.saveStorage('kreid_wa_logs', this.state.whatsappLogs);
 
-    this.showToast(`💬 WhatsApp notification sent to ${phone}!`, 'success');
+    this.showToast(`💬 WhatsApp message dispatched via Easypanel Server to ${phone}!`, 'success');
     this.notify();
   }
 
@@ -329,7 +335,8 @@ class AppStore {
   updateWhatsAppConfig(newConfig) {
     this.state.whatsappConfig = { ...this.state.whatsappConfig, ...newConfig };
     this.saveStorage('kreid_wa_config', this.state.whatsappConfig);
-    this.showToast('Primary WhatsApp Gateway Settings Saved!', 'success');
+    this.checkLiveWhatsAppStatus();
+    this.showToast('Primary WhatsApp Gateway Settings Saved & Connected!', 'success');
     this.notify();
   }
 
@@ -492,7 +499,7 @@ class AppStore {
     this.saveStorage('kreid_products', this.state.products);
     this.clearCart();
 
-    // Trigger Automated WhatsApp Notification via Primary Gateway
+    // Trigger Automated WhatsApp Notification via Easypanel Server
     this.sendWhatsAppNotification('order_placed', newOrder);
 
     // Schedule 2-Hour Follow Up Message

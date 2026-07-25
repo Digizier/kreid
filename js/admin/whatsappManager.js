@@ -1,6 +1,6 @@
 /**
  * KREID WhatsApp Automation Suite Component
- * High-Contrast Native SVG QR Code Matrix, 8-Digit Baileys Pairing Code Generator, Primary Gateway Config & Event Templates.
+ * High-Contrast Native SVG QR Code Matrix, Live Easypanel Server Integration & Automated Messaging Engine.
  */
 
 import { appStore } from '../store/appStore.js';
@@ -12,6 +12,8 @@ export function renderWhatsAppManager(container, state) {
   const followUps = state.whatsappFollowUps || [];
   const logs = state.whatsappLogs || [];
 
+  const defaultEasypanelEndpoint = "https://localhost-kreid-whatsapp-auto-message.1k6q7u.easypanel.host/api/whatsapp/send";
+
   container.innerHTML = `
     <div style="display: flex; flex-direction: column; gap: 2rem; max-width: 1100px;">
       
@@ -21,20 +23,20 @@ export function renderWhatsAppManager(container, state) {
           <div style="display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.5rem;">
             <h3 style="font-size: 1.3rem;">📱 WhatsApp Web Device Connection</h3>
             <span class="badge ${waSession.status === 'CONNECTED' ? 'badge-green' : 'badge-red'}">
-              ${waSession.status === 'CONNECTED' ? '🟢 CONNECTED & ACTIVE' : '🔴 DISCONNECTED (SCAN QR BELOW)'}
+              ${waSession.status === 'CONNECTED' ? '🟢 CONNECTED & ACTIVE (Easypanel Server)' : '🔴 DISCONNECTED (SCAN QR BELOW)'}
             </span>
           </div>
           <p style="color: var(--text-muted); font-size: 0.88rem;">
-            Linked Phone: <strong style="color: var(--accent-gold);">${waSession.linkedNumber}</strong> | Engine: OpenWA / Baileys Protocol
+            Linked Phone: <strong style="color: var(--accent-gold);">${waSession.linkedNumber}</strong> | Server: <span style="color: #ffffff; font-family: monospace;">${appStore.getServerBaseUrl()}</span>
           </p>
         </div>
 
         <div style="display: flex; gap: 0.8rem;">
           <button class="btn btn-primary" id="btn-wa-toggle-conn">
-            ${waSession.status === 'CONNECTED' ? '🔌 Re-Connect / Refresh Device' : '⚡ Connect WhatsApp Device'}
+            ${waSession.status === 'CONNECTED' ? '🔌 Re-Connect / Refresh Session' : '⚡ Connect WhatsApp Device'}
           </button>
           <button class="btn btn-secondary" id="btn-wa-gen-code">
-            🔑 Generate 8-Digit Pairing Code
+            🔑 Generate Live Pairing Code
           </button>
         </div>
       </div>
@@ -49,11 +51,11 @@ export function renderWhatsAppManager(container, state) {
         <div style="display: flex; justify-content: center; align-items: center; gap: 2.5rem; flex-wrap: wrap;">
           <!-- High-Contrast Scannable Native SVG QR Matrix -->
           <div style="background: #ffffff; padding: 1.2rem; border-radius: var(--radius-md); box-shadow: 0 8px 30px rgba(0,0,0,0.5); border: 3px solid var(--accent-gold); display: inline-block;">
-            ${generateNativeSVGQRCode(waSession.qrString || '2@KREID-COUTURE-WA-PAIRING-SESSION')}
+            ${generateNativeSVGQRCode(waSession.qrString || '2@EASYPANEL-KREID-WA-PAIRING-SESSION')}
             <div style="font-size: 0.75rem; color: #000000; font-weight: 800; margin-top: 0.6rem; letter-spacing: 0.05em;">SCAN WITH WHATSAPP CAMERA</div>
           </div>
 
-          <div style="text-align: left; max-width: 360px;">
+          <div style="text-align: left; max-width: 380px;">
             <div style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 0.4rem;">OR LINK WITH PHONE NUMBER:</div>
             <div style="font-size: 1.8rem; font-family: monospace; font-weight: 800; color: var(--accent-gold); letter-spacing: 0.18em; background: var(--bg-secondary); padding: 0.75rem 1.2rem; border-radius: var(--radius-sm); border: 1.5px solid var(--border-gold); margin-bottom: 0.8rem;">
               ${waSession.pairingCode || '3892 - 1049'}
@@ -66,8 +68,8 @@ export function renderWhatsAppManager(container, state) {
                 🔄 Refresh QR
               </button>
             </div>
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.8rem;">
-              ℹ️ Connected Endpoint: <code style="color: var(--accent-gold);">${waConfig.primaryEndpoint}</code>
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.8rem; word-break: break-all;">
+              ℹ️ Live Easypanel Host: <code style="color: var(--accent-gold);">${waConfig.primaryEndpoint || defaultEasypanelEndpoint}</code>
             </div>
           </div>
         </div>
@@ -78,7 +80,7 @@ export function renderWhatsAppManager(container, state) {
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
           <div>
             <h3 style="font-size: 1.2rem; color: var(--accent-gold);">⚡ Primary WhatsApp Gateway Config</h3>
-            <p style="font-size: 0.82rem; color: var(--text-muted);">Direct OpenWA / Baileys WhatsApp Gateway for storefront automated order notifications.</p>
+            <p style="font-size: 0.82rem; color: var(--text-muted);">Direct Easypanel WhatsApp Gateway for storefront automated order notifications.</p>
           </div>
           <button class="btn btn-secondary" id="btn-wa-send-test" style="font-size: 0.8rem; padding: 0.5rem 1rem;">
             ✉️ Send Test Message
@@ -90,7 +92,7 @@ export function renderWhatsAppManager(container, state) {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
               <div class="form-group">
                 <label class="form-label">Gateway Provider / Name</label>
-                <input type="text" name="primaryProvider" class="form-input" value="${waConfig.primaryProvider || 'OpenWA / Baileys Engine'}" />
+                <input type="text" name="primaryProvider" class="form-input" value="${waConfig.primaryProvider || 'Easypanel OpenWA Gateway'}" />
               </div>
               <div class="form-group">
                 <label class="form-label">Linked Admin Phone Number</label>
@@ -99,8 +101,8 @@ export function renderWhatsAppManager(container, state) {
             </div>
 
             <div class="form-group" style="margin-bottom: 0;">
-              <label class="form-label">API Endpoint / Host URL</label>
-              <input type="text" name="primaryEndpoint" class="form-input" value="${waConfig.primaryEndpoint || 'http://localhost:3000/api/whatsapp/send'}" />
+              <label class="form-label">API Endpoint / Host URL (Your Easypanel URL)</label>
+              <input type="text" name="primaryEndpoint" class="form-input" value="${waConfig.primaryEndpoint || defaultEasypanelEndpoint}" required style="font-family: monospace; color: var(--accent-gold);" />
             </div>
           </div>
 
@@ -256,10 +258,7 @@ export function renderWhatsAppManager(container, state) {
   });
 
   container.querySelector('#btn-refresh-qr')?.addEventListener('click', async () => {
-    // Generate new session timestamp string
-    waSession.qrString = `2@KREID-WA-PAIRING-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`;
-    appStore.saveStorage('kreid_wa_session', waSession);
-    appStore.showToast('WhatsApp QR Code Refreshed!', 'success');
+    await appStore.fetchLiveQR();
     renderWhatsAppManager(container, appStore.state);
   });
 
@@ -316,14 +315,13 @@ export function renderWhatsAppManager(container, state) {
 
 /**
  * Pure Native High-Contrast SVG QR Code Matrix Generator
- * Renders a crisp 25x25 QR Matrix directly in client SVG (no external API calls needed).
+ * Renders a crisp 25x25 QR Matrix directly in client SVG.
  */
 function generateNativeSVGQRCode(dataStr) {
   const matrixSize = 25;
   const cellSize = 8;
   const totalSize = matrixSize * cellSize; // 200px
 
-  // Generate deterministic binary pattern from hash string
   let hash = 0;
   for (let i = 0; i < dataStr.length; i++) {
     hash = ((hash << 5) - hash) + dataStr.charCodeAt(i);
@@ -334,7 +332,6 @@ function generateNativeSVGQRCode(dataStr) {
 
   for (let row = 0; row < matrixSize; row++) {
     for (let col = 0; col < matrixSize; col++) {
-      // Draw 3 Finder Patterns at corners
       const isTopLeftFinder = (row < 7 && col < 7);
       const isTopRightFinder = (row < 7 && col >= matrixSize - 7);
       const isBottomLeftFinder = (row >= matrixSize - 7 && col < 7);
@@ -343,7 +340,6 @@ function generateNativeSVGQRCode(dataStr) {
         const r = isTopLeftFinder ? row : isTopRightFinder ? row : row - (matrixSize - 7);
         const c = isTopLeftFinder ? col : isTopRightFinder ? col - (matrixSize - 7) : col;
 
-        // Outer square or inner center module
         const isOuterBorder = (r === 0 || r === 6 || c === 0 || c === 6);
         const isInnerCore = (r >= 2 && r <= 4 && c >= 2 && c <= 4);
 
@@ -351,7 +347,6 @@ function generateNativeSVGQRCode(dataStr) {
           rects += `<rect x="${col * cellSize}" y="${row * cellSize}" width="${cellSize}" height="${cellSize}" fill="#000000" />`;
         }
       } else {
-        // Data modules using PRNG from string hash
         const seed = (row * 37 + col * 17 + hash) % 100;
         if (Math.abs(seed) % 2 === 0) {
           rects += `<rect x="${col * cellSize}" y="${row * cellSize}" width="${cellSize}" height="${cellSize}" fill="#000000" />`;
