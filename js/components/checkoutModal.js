@@ -1,14 +1,12 @@
 /**
- * Multi-Step Pakistani Checkout Modal Component
- * Step 1: Customer Info & City
- * Step 2: Courier Logistics Selection (TCS, Trax, Leopards)
- * Step 3: Pakistani Payment Method (COD, JazzCash, EasyPaisa, SadaPay/NayaPay, Bank Transfer) + Account Details + Mandatory Proof Screenshot Upload + 2hr Notice
- * Step 4: Receipt & Consignment Tracking Generator
+ * Multi-Step Pakistani Checkout & Consignment Confirmation Suite
+ * Featuring High-Contrast Local UI Error Alerts (No Browser Alerts) & Local Order Confirmation Receipt Modal
  */
 
 import { appStore } from '../store/appStore.js';
 
 let paymentProofBase64 = null;
+let confirmedOrderData = null;
 
 export function renderCheckoutModal(container, state) {
   const isOpen = state.isCheckoutOpen;
@@ -19,10 +17,17 @@ export function renderCheckoutModal(container, state) {
     container.classList.remove('active');
     container.innerHTML = '';
     paymentProofBase64 = null;
+    confirmedOrderData = null;
     return;
   }
 
   container.classList.add('active');
+
+  // If order is confirmed, render Local Order Confirmation Receipt UI!
+  if (confirmedOrderData) {
+    renderLocalOrderConfirmationUI(container, confirmedOrderData);
+    return;
+  }
 
   container.innerHTML = `
     <div class="checkout-modal-card">
@@ -32,6 +37,19 @@ export function renderCheckoutModal(container, state) {
       <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem;">
         Complete your order below for fast delivery across Pakistan.
       </p>
+
+      <!-- Local UI Payment Proof Error Banner -->
+      <div id="payment-proof-error-banner" style="display: none; background: rgba(231,76,60,0.15); border: 2px solid #ff6b6b; border-radius: var(--radius-md); padding: 1rem 1.2rem; margin-bottom: 1.5rem; box-shadow: 0 0 25px rgba(255,107,107,0.35);">
+        <div style="display: flex; align-items: flex-start; gap: 0.9rem;">
+          <div style="font-size: 1.8rem; color: #ff6b6b; line-height: 1;">⚠️</div>
+          <div>
+            <h4 style="color: #ff6b6b; font-size: 1rem; font-weight: 800; margin-bottom: 0.2rem;">PAYMENT PROOF SCREENSHOT REQUIRED</h4>
+            <p id="payment-proof-error-msg" style="color: #ffffff; font-size: 0.85rem; margin: 0; line-height: 1.4;">
+              Please attach your transaction screenshot before submitting your order.
+            </p>
+          </div>
+        </div>
+      </div>
 
       <form id="checkout-form">
         <!-- Section 1: Shipping Address -->
@@ -134,12 +152,12 @@ export function renderCheckoutModal(container, state) {
             </label>
           </div>
 
-          <!-- Dynamic Digital Payment Account Details & Screenshot Upload Box -->
-          <div id="digital-payment-details-box" style="display: none; background: rgba(212, 175, 55, 0.08); border: 1.5px solid var(--accent-gold); border-radius: var(--radius-md); padding: 1.4rem;">
+          <!-- Dynamic Digital Payment Details & Screenshot Upload Box -->
+          <div id="digital-payment-details-box" style="display: none; background: rgba(212, 175, 55, 0.08); border: 1.5px solid var(--accent-gold); border-radius: var(--radius-md); padding: 1.4rem; transition: all 0.3s ease;">
             <div id="payment-instructions-content"></div>
 
             <!-- Upload Screenshot Box -->
-            <div style="margin-top: 1.2rem; border-top: 1px dashed var(--border-gold); padding-top: 1rem;">
+            <div id="proof-upload-container" style="margin-top: 1.2rem; border-top: 1px dashed var(--border-gold); padding-top: 1rem;">
               <label class="form-label" style="color: var(--accent-gold); font-weight: 700; font-size: 0.95rem;">
                 📸 Attach Payment Proof Screenshot * (Mandatory for digital payments)
               </label>
@@ -173,6 +191,9 @@ export function renderCheckoutModal(container, state) {
 
   const detailsBox = container.querySelector('#digital-payment-details-box');
   const instructionsContent = container.querySelector('#payment-instructions-content');
+  const errorBanner = container.querySelector('#payment-proof-error-banner');
+  const errorMsg = container.querySelector('#payment-proof-error-msg');
+  const proofContainer = container.querySelector('#proof-upload-container');
   const form = container.querySelector('#checkout-form');
 
   function updatePaymentDisplay(selectedVal) {
@@ -221,7 +242,6 @@ export function renderCheckoutModal(container, state) {
     }
   }
 
-  // Attach Change & Click Listeners to All Payment Radios and Parent Cards
   form.addEventListener('change', (e) => {
     if (e.target.name === 'paymentMethod') {
       updatePaymentDisplay(e.target.value);
@@ -239,7 +259,6 @@ export function renderCheckoutModal(container, state) {
     });
   });
 
-  // Attach Proof File Input Reader
   const proofInput = container.querySelector('#payment-proof-file-input');
   const proofPreview = container.querySelector('#proof-img-preview');
   const proofImg = container.querySelector('#proof-img-elem');
@@ -253,28 +272,34 @@ export function renderCheckoutModal(container, state) {
           paymentProofBase64 = evt.target.result;
           proofImg.src = paymentProofBase64;
           proofPreview.style.display = 'block';
+          errorBanner.style.display = 'none';
+          if (proofContainer) proofContainer.style.border = 'none';
         };
         reader.readAsDataURL(file);
       }
     });
   }
 
-  // Close Checkout Modal
   container.querySelector('#btn-close-checkout')?.addEventListener('click', () => {
     appStore.toggleCheckout(false);
   });
 
-  // Submit Order Form with Mandatory Payment Proof Validation
+  // Form Submission Handler with Local UI Error Box & Local Order Confirmation UI
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const formData = new FormData(form);
     const selectedPay = formData.get('paymentMethod');
 
-    // Strict Validation: If digital payment selected, paymentProofBase64 MUST NOT be null!
+    // High-End Local UI Validation Error Banner
     if (selectedPay !== 'Cash on Delivery' && !paymentProofBase64) {
-      alert(`⚠️ PAYMENT PROOF SCREENSHOT REQUIRED!\n\nYou selected ${selectedPay}. Please attach a screenshot of your payment transfer before proceeding with your order.`);
-      proofInput?.focus();
-      proofInput?.scrollIntoView({ behavior: 'smooth' });
+      errorMsg.innerHTML = `You selected <strong>${selectedPay}</strong>. Please attach your transaction screenshot before submitting your order.`;
+      errorBanner.style.display = 'block';
+      if (proofContainer) {
+        proofContainer.style.border = '2px solid #ff6b6b';
+        proofContainer.style.borderRadius = '8px';
+        proofContainer.style.padding = '1rem';
+      }
+      errorBanner.scrollIntoView({ behavior: 'smooth', block: 'center' });
       return;
     }
 
@@ -289,10 +314,115 @@ export function renderCheckoutModal(container, state) {
       paymentProof: paymentProofBase64 || null
     };
 
-    const newOrder = appStore.createOrder(orderDetails);
+    confirmedOrderData = appStore.createOrder(orderDetails);
     paymentProofBase64 = null;
-    appStore.toggleCheckout(false);
+    renderCheckoutModal(container, appStore.state);
+  });
+}
 
-    alert(`🎉 ALHAMDULILLAH! YOUR ORDER HAS BEEN PLACED SUCCESSFULLY!\n\nOrder ID: #${newOrder.id}\nConsignment Tracking #: ${newOrder.trackingNo}\nCourier: ${newOrder.courier}\nPayment Method: ${newOrder.paymentMethod}\nTotal Amount: PKR ${newOrder.total.toLocaleString()}\n\n${selectedPay !== 'Cash on Delivery' ? '💬 Our support team will verify your payment proof screenshot and confirm your order via WhatsApp / Call within 2 hours!' : ''}`);
+/**
+ * Local Order Confirmation Receipt UI Component
+ * Replaces old browser alerts with a stunning dark luxury order receipt modal.
+ */
+function renderLocalOrderConfirmationUI(container, order) {
+  const isDigital = order.paymentMethod !== 'Cash on Delivery';
+
+  container.innerHTML = `
+    <div class="checkout-modal-card" style="max-width: 680px; padding: 2.2rem;">
+      <button class="modal-close-btn" id="btn-close-confirmation">✕</button>
+
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <div style="width: 70px; height: 70px; background: rgba(46, 204, 113, 0.15); border: 2.5px solid var(--accent-green); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2.2rem; color: var(--accent-green); margin: 0 auto 0.8rem; box-shadow: 0 0 30px rgba(46,204,113,0.3);">
+          ✓
+        </div>
+        <h2 style="font-size: 1.6rem; color: #ffffff; margin-bottom: 0.3rem;">ALHAMDULILLAH! ORDER CONFIRMED</h2>
+        <p style="color: var(--accent-gold); font-weight: 700; font-size: 0.95rem;">
+          Thank you for choosing KREID COUTURE!
+        </p>
+      </div>
+
+      <!-- Order ID & Tracking Reference Card -->
+      <div style="background: var(--bg-secondary); border: 1.5px solid var(--accent-gold); border-radius: var(--radius-md); padding: 1.2rem 1.4rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+        <div>
+          <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">ORDER REFERENCE ID</div>
+          <div style="font-size: 1.3rem; font-weight: 800; color: #ffffff; font-family: monospace;">#${order.id}</div>
+        </div>
+
+        <div>
+          <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;">CONSIGNMENT TRACKING #</div>
+          <div style="font-size: 1.3rem; font-weight: 800; color: var(--accent-gold); font-family: monospace;">${order.trackingNo}</div>
+        </div>
+      </div>
+
+      <!-- Shipping & Payment Breakdown -->
+      <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.2rem; margin-bottom: 1.5rem;">
+        <h4 style="color: var(--accent-gold); font-size: 0.98rem; margin-bottom: 0.8rem; border-bottom: 1px solid var(--border-light); padding-bottom: 0.4rem;">
+          📦 Order Delivery Summary
+        </h4>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.88rem; margin-bottom: 1rem;">
+          <div>
+            <span style="color: var(--text-muted);">Customer:</span> <strong style="color: #fff;">${order.customerName}</strong>
+          </div>
+          <div>
+            <span style="color: var(--text-muted);">Phone:</span> <strong style="color: #fff;">${order.phone}</strong>
+          </div>
+          <div>
+            <span style="color: var(--text-muted);">Courier:</span> <strong style="color: #fff;">${order.courier}</strong>
+          </div>
+          <div>
+            <span style="color: var(--text-muted);">Destination City:</span> <strong style="color: #fff;">${order.city}</strong>
+          </div>
+          <div style="grid-column: span 2;">
+            <span style="color: var(--text-muted);">Address:</span> <strong style="color: #fff;">${order.address}</strong>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-primary); padding: 0.8rem 1rem; border-radius: var(--radius-sm); border: 1px solid var(--border-light);">
+          <div>
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Payment Method</div>
+            <strong style="color: #fff; font-size: 0.95rem;">${order.paymentMethod}</strong>
+          </div>
+          <div style="text-align: right;">
+            <div style="font-size: 0.8rem; color: var(--text-muted);">Total Amount Paid</div>
+            <strong style="color: var(--accent-gold); font-size: 1.2rem;">PKR ${order.total.toLocaleString()}</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live WhatsApp Dispatch Notification Notice -->
+      <div style="background: rgba(46, 204, 113, 0.08); border-left: 4px solid var(--accent-green); padding: 1rem 1.2rem; border-radius: var(--radius-sm); font-size: 0.85rem; color: #ffffff; line-height: 1.5; margin-bottom: 1.5rem;">
+        💬 <strong>WhatsApp Order Confirmation:</strong> An automated WhatsApp order receipt has been dispatched to <strong>${order.phone}</strong> via your Easypanel WhatsApp Gateway server!
+        ${isDigital ? `<br/><br/>ℹ️ <em>Our team will verify your payment proof screenshot and confirm your consignment dispatch within 2 hours.</em>` : ''}
+      </div>
+
+      <!-- Action Buttons -->
+      <div style="display: flex; gap: 1rem;">
+        <button class="btn btn-secondary" id="btn-track-confirmed-order" style="flex: 1; padding: 0.9rem;">
+          🚚 Track Live Order Status
+        </button>
+        <button class="btn btn-primary" id="btn-continue-shopping" style="flex: 1; padding: 0.9rem;">
+          🛍️ Continue Shopping
+        </button>
+      </div>
+    </div>
+  `;
+
+  container.querySelector('#btn-close-confirmation')?.addEventListener('click', () => {
+    confirmedOrderData = null;
+    appStore.toggleCheckout(false);
+  });
+
+  container.querySelector('#btn-continue-shopping')?.addEventListener('click', () => {
+    confirmedOrderData = null;
+    appStore.toggleCheckout(false);
+  });
+
+  container.querySelector('#btn-track-confirmed-order')?.addEventListener('click', () => {
+    const targetOrder = confirmedOrderData;
+    confirmedOrderData = null;
+    appStore.toggleCheckout(false);
+    appStore.state.trackedOrder = targetOrder;
+    appStore.toggleOrderTracker(true);
   });
 }
