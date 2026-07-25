@@ -1,6 +1,6 @@
 /**
  * Header Component for KREID Storefront
- * Crisp Mobile Brand Text + Logo & Full-Width Luxury Search Drawer
+ * Clean Single-Line Mobile Brand Text "KREID" & Luxury Search Drawer
  */
 
 import { appStore } from '../store/appStore.js';
@@ -29,7 +29,7 @@ export function renderHeader(container, state) {
           <!-- Brand Logo -->
           <a href="#" class="brand-logo" id="logo-home">
             <img src="assets/kreid-logo.svg" alt="KREID COUTURE" class="logo-desktop-img" />
-            <span class="logo-mobile-text">KREID <span class="gold">COUTURE</span></span>
+            <span class="logo-mobile-text">KREID</span>
           </a>
         </div>
 

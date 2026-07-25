@@ -102,7 +102,14 @@
 
 .logo-mobile-text {
   display: none !important;
+  font-family: var(--font-heading);
+  font-weight: 800;
+  font-size: 1.3rem;
+  letter-spacing: 0.18em;
+  color: var(--accent-gold);
+  white-space: nowrap;
 }
+
 
 .logo-desktop-img {
   display: block !important;
