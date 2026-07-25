@@ -1,11 +1,12 @@
 /**
  * KREID Administrative Control Suite Dashboard
- * 24 individual 1-hour hourly live sales SVG graph, storefront order sync, payment proof screenshot inspector, coupon activator/deactivator, and gateway accounts manager.
+ * Integrated 24-hour live sales graph, live storefront order sync, WhatsApp Automation & Dual-Gateway Suite, coupon manager, and payment gateway account editor.
  */
 
 import { appStore } from '../store/appStore.js';
+import { renderWhatsAppManager } from './whatsappManager.js';
 
-let activeTab = 'dashboard'; // 'dashboard' | 'products' | 'orders' | 'coupons' | 'settings'
+let activeTab = 'dashboard'; // 'dashboard' | 'products' | 'orders' | 'coupons' | 'whatsapp' | 'settings'
 let editingProduct = null;
 let uploadedImages = [];
 
@@ -37,6 +38,9 @@ export function renderAdminDashboard(container, state) {
           <div class="menu-item ${activeTab === 'orders' ? 'active' : ''}" data-tab="orders">
             🚚 Orders & Dispatch (${totalOrders})
           </div>
+          <div class="menu-item ${activeTab === 'whatsapp' ? 'active' : ''}" data-tab="whatsapp">
+            📱 WhatsApp Automation
+          </div>
           <div class="menu-item ${activeTab === 'coupons' ? 'active' : ''}" data-tab="coupons">
             🎟️ Discount Coupons (${state.coupons.length})
           </div>
@@ -61,6 +65,7 @@ export function renderAdminDashboard(container, state) {
               ${activeTab === 'dashboard' ? 'Executive Overview & 24hr Hourly Live Analytics' :
                 activeTab === 'products' ? 'Product Inventory Manager' :
                 activeTab === 'orders' ? 'Order Fulfillment & Payment Proof Inspector' :
+                activeTab === 'whatsapp' ? 'WhatsApp Automation & Dual-Gateway Suite' :
                 activeTab === 'coupons' ? 'Promotions & Coupons Engine' : 'Payment Accounts & Logistics Settings'}
             </h1>
             <p style="color: var(--text-muted); font-size: 0.85rem;">
@@ -83,7 +88,9 @@ export function renderAdminDashboard(container, state) {
         </div>
 
         <!-- Dynamic Tab Content -->
-        ${renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowStockCount)}
+        ${activeTab === 'whatsapp' 
+          ? '<div id="whatsapp-tab-container"></div>'
+          : renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowStockCount)}
 
       </main>
     </div>
@@ -94,6 +101,12 @@ export function renderAdminDashboard(container, state) {
     <div id="admin-order-modal-root" class="modal-overlay"></div>
     <div id="admin-proof-modal-root" class="modal-overlay"></div>
   `;
+
+  // Render WhatsApp Sub Tab if active
+  if (activeTab === 'whatsapp') {
+    const waContainer = container.querySelector('#whatsapp-tab-container');
+    if (waContainer) renderWhatsAppManager(waContainer, state);
+  }
 
   // Attach Sidebar Tab Listeners
   const menuItems = container.querySelectorAll('.menu-item');
@@ -354,7 +367,6 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
 
 /* Dynamic 24 Individual 1-Hour Interval Sales SVG Graph Builder (1h, 2h, 3h ... 24h) */
 function render24HourSVGChart(orders) {
-  // 24 individual 1-hour slots: 0h to 23h
   const hourlySlots = Array(24).fill(0);
 
   orders.forEach(o => {
@@ -380,18 +392,13 @@ function render24HourSVGChart(orders) {
   return `
     <div style="overflow-x: auto; padding-bottom: 0.5rem;">
       <svg class="svg-chart" viewBox="0 0 ${width} ${height + 30}" style="min-width: 900px;">
-        <!-- Grid Lines -->
         <line x1="${paddingX}" y1="30" x2="${width - paddingX}" y2="30" stroke="rgba(255,255,255,0.06)" stroke-width="1" />
         <line x1="${paddingX}" y1="80" x2="${width - paddingX}" y2="80" stroke="rgba(255,255,255,0.06)" stroke-width="1" />
         <line x1="${paddingX}" y1="130" x2="${width - paddingX}" y2="130" stroke="rgba(255,255,255,0.06)" stroke-width="1" />
 
-        <!-- Area Gradient Fill -->
         <path d="${pathD}" fill="url(#live-chart-grad-24)" />
-
-        <!-- Glowing Line -->
         <path d="${strokeD}" fill="none" stroke="#d4af37" stroke-width="3" filter="drop-shadow(0 0 6px rgba(212,175,55,0.6))" />
 
-        <!-- Data Dots & 24 Individual 1-Hour Labels (1h, 2h, 3h... 24h) -->
         ${points.map((p) => `
           <circle cx="${p.x}" cy="${p.y}" r="4" fill="#0a0a0d" stroke="#d4af37" stroke-width="2" />
           ${p.val > 0 ? `

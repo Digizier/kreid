@@ -1,6 +1,6 @@
 /**
  * KREID Central Reactive Store & State Manager
- * Handles local persistence, state changes, subscribers, and order/coupon workflows.
+ * Handles local persistence, state changes, subscribers, order/coupon workflows, and WhatsApp messaging engine.
  */
 
 import { initialProducts } from '../data/products.js';
@@ -35,7 +35,7 @@ class AppStore {
           shippingFee: 200,
           total: 3700,
           status: "Processing",
-          timestamp: Date.now() - 3600000 * 2, // 2 hours ago
+          timestamp: Date.now() - 3600000 * 2,
           date: "2026-07-25 15:30"
         },
         {
@@ -57,29 +57,8 @@ class AppStore {
           shippingFee: 250,
           total: 4030,
           status: "Shipped",
-          timestamp: Date.now() - 3600000 * 5, // 5 hours ago
+          timestamp: Date.now() - 3600000 * 5,
           date: "2026-07-25 12:15"
-        },
-        {
-          id: "ORD-98229",
-          trackingNo: "LPD-1092841",
-          customerName: "Hamza Malik",
-          email: "hamza@example.pk",
-          phone: "+92 333 1122334",
-          address: "Gulberg III, Main Boulevard",
-          city: "Lahore",
-          courier: "Leopards Courier",
-          paymentMethod: "Cash on Delivery",
-          items: [
-            { id: "prod-3", name: "Air Jordan 4 – Nigel Sylvester 'BIKE AIR'", price: 6800, quantity: 1, selectedSize: "43", selectedColor: "Off-White / Sail" }
-          ],
-          subtotal: 6800,
-          discount: 0,
-          shippingFee: 0,
-          total: 6800,
-          status: "Delivered",
-          timestamp: Date.now() - 3600000 * 9, // 9 hours ago
-          date: "2026-07-25 08:45"
         }
       ]),
       coupons: this.loadStorage('kreid_coupons', [
@@ -93,6 +72,46 @@ class AppStore {
         sadapay: { title: "KREID COUTURE SADA", number: "0333 4455667" },
         bank: { bankName: "Bank Alfalah Limited", title: "KREID COUTURE SMC PVT LTD", iban: "PK45 BAHL 0001 2345 6789 0123" }
       }),
+      // WhatsApp Automation State
+      whatsappConfig: this.loadStorage('kreid_wa_config', {
+        primaryProvider: "OpenWA / Baileys Web Engine",
+        primaryEndpoint: "http://localhost:3000/api/whatsapp/send",
+        fallbackProvider: "Twilio / Meta WhatsApp API",
+        fallbackApiKey: "TW-LIVE-PK-98241092"
+      }),
+      whatsappSession: this.loadStorage('kreid_wa_session', {
+        status: "CONNECTED",
+        linkedNumber: "+92 300 1234567",
+        pairingCode: "K8R3-9W21"
+      }),
+      whatsappTemplates: this.loadStorage('kreid_wa_templates', {
+        order_placed: "Assalam-o-Alaikum [Customer Name]! Thank you for your order #[Order ID] at KREID COUTURE. Total: PKR [Total PKR]. Courier: [Courier]. Tracking #: [Tracking Number]. Our team will verify and dispatch your order shortly!",
+        status_shipped: "Hi [Customer Name]! Great news! Your KREID order #[Order ID] has been SHIPPED via [Courier]. Tracking #: [Tracking Number]. Track live at KREID portal!",
+        status_delivered: "Assalam-o-Alaikum [Customer Name]! Your KREID order #[Order ID] has been DELIVERED. Thank you for choosing KREID COUTURE! We hope you love your outfit."
+      }),
+      whatsappFollowUps: this.loadStorage('kreid_wa_followups', [
+        {
+          orderId: "ORD-98231",
+          customerName: "Zain Ali",
+          phone: "+92 300 9876543",
+          sendTime: "Today at 18:30 (In 2 Hours)",
+          status: "SCHEDULED"
+        }
+      ]),
+      whatsappLogs: this.loadStorage('kreid_wa_logs', [
+        {
+          phone: "+92 300 9876543",
+          event: "ORDER_PLACED",
+          gateway: "Primary (OpenWA)",
+          timestamp: "2026-07-25 15:30"
+        },
+        {
+          phone: "+92 321 4567890",
+          event: "STATUS_SHIPPED",
+          gateway: "Primary (OpenWA)",
+          timestamp: "2026-07-25 12:15"
+        }
+      ]),
       activeCoupon: null,
       activeCategory: 'all',
       searchQuery: '',
@@ -180,6 +199,54 @@ class AppStore {
 
   toggleWishlistModal(isOpen) {
     this.state.isWishlistOpen = isOpen !== undefined ? isOpen : !this.state.isWishlistOpen;
+    this.notify();
+  }
+
+  // WhatsApp Messaging Actions with Dual-Gateway Failover
+  sendWhatsAppNotification(eventType, orderData) {
+    const phone = orderData.phone || "+92 300 1234567";
+    const templates = this.state.whatsappTemplates;
+    let templateText = templates[eventType] || templates.order_placed || "Hello from KREID COUTURE!";
+
+    // Replace tags
+    templateText = templateText
+      .replace(/\[Customer Name\]/g, orderData.customerName || 'Valued Customer')
+      .replace(/\[Order ID\]/g, orderData.id || 'N/A')
+      .replace(/\[Total PKR\]/g, orderData.total ? orderData.total.toLocaleString() : '0')
+      .replace(/\[Courier\]/g, orderData.courier || 'Trax Logistics')
+      .replace(/\[Tracking Number\]/g, orderData.trackingNo || 'TRX-101');
+
+    // Failover Simulation
+    const primaryConnected = this.state.whatsappSession.status === 'CONNECTED';
+    const gatewayUsed = primaryConnected 
+      ? `Primary (${this.state.whatsappConfig.primaryProvider})`
+      : `Fallback (${this.state.whatsappConfig.fallbackProvider})`;
+
+    const logItem = {
+      phone,
+      event: eventType.toUpperCase(),
+      gateway: gatewayUsed,
+      timestamp: new Date().toLocaleString('en-US', { hour12: false })
+    };
+
+    this.state.whatsappLogs.unshift(logItem);
+    this.saveStorage('kreid_wa_logs', this.state.whatsappLogs);
+
+    this.showToast(`💬 WhatsApp message sent to ${phone} via ${gatewayUsed}`, 'success');
+    this.notify();
+  }
+
+  toggleWhatsAppConnection() {
+    this.state.whatsappSession.status = this.state.whatsappSession.status === 'CONNECTED' ? 'DISCONNECTED' : 'CONNECTED';
+    this.saveStorage('kreid_wa_session', this.state.whatsappSession);
+    this.showToast(`WhatsApp Device Status: ${this.state.whatsappSession.status}`, 'info');
+    this.notify();
+  }
+
+  updateWhatsAppConfig(newConfig) {
+    this.state.whatsappConfig = { ...this.state.whatsappConfig, ...newConfig };
+    this.saveStorage('kreid_wa_config', this.state.whatsappConfig);
+    this.showToast('WhatsApp Dual-Gateway Settings Saved!', 'success');
     this.notify();
   }
 
@@ -342,6 +409,19 @@ class AppStore {
     this.saveStorage('kreid_products', this.state.products);
     this.clearCart();
 
+    // Trigger Automated WhatsApp Notification
+    this.sendWhatsAppNotification('order_placed', newOrder);
+
+    // Schedule 2-Hour Follow Up Message
+    this.state.whatsappFollowUps.unshift({
+      orderId: newOrder.id,
+      customerName: newOrder.customerName,
+      phone: newOrder.phone,
+      sendTime: "In 2 Hours (" + new Date(Date.now() + 7200000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ")",
+      status: "SCHEDULED"
+    });
+    this.saveStorage('kreid_wa_followups', this.state.whatsappFollowUps);
+
     this.showToast(`Order #${newOrder.id} confirmed! Tracking: ${newOrder.trackingNo}`, 'success');
     this.notify();
     return newOrder;
@@ -353,6 +433,11 @@ class AppStore {
     if (order) {
       order.status = newStatus;
       this.saveStorage('kreid_orders', this.state.orders);
+      
+      // Trigger WhatsApp status notification
+      const eventKey = 'status_' + newStatus.toLowerCase();
+      this.sendWhatsAppNotification(eventKey, order);
+
       this.showToast(`Order #${orderId} status updated to "${newStatus}"`, 'success');
       this.notify();
     }

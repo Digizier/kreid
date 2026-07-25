@@ -1,10 +1,20 @@
 /**
  * Floating Official WhatsApp Support Widget
+ * Automatically hidden when admin is in Admin Panel View Mode.
  */
 
+import { appStore } from '../store/appStore.js';
+
 export function renderSupportWidget(container) {
+  const isStorefront = appStore.state.view === 'storefront';
+
+  if (!isStorefront) {
+    container.innerHTML = '';
+    return;
+  }
+
   container.innerHTML = `
-    <!-- Floating WhatsApp Action Button -->
+    <!-- Floating WhatsApp Action Button (Storefront Only) -->
     <a href="https://wa.me/923001234567?text=Hi%20KREID%20Team!%20I%20have%20a%20question%20about%20your%20products." 
        target="_blank" 
        class="floating-support-btn" 
