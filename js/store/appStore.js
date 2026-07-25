@@ -220,7 +220,6 @@ class AppStore {
     const days = manualDays !== null ? manualDays : (configDays !== undefined && configDays !== null ? configDays : 30);
     if (days === 0) return 0; // 0 means Never auto-delete
 
-
     const cutoffTimestamp = Date.now() - (days * 86400000);
     const initialLogsCount = this.state.whatsappLogs.length;
     const initialFollowUpsCount = this.state.whatsappFollowUps.length;
@@ -246,6 +245,39 @@ class AppStore {
     return purgedCount;
   }
 
+  // Auto Purge Data Retention Engine for Orders
+  purgeOldOrders(manualDays = null) {
+    const days = manualDays !== null ? manualDays : (this.state.orderRetentionDays !== undefined ? this.state.orderRetentionDays : 30);
+    if (days === 0) return 0; // 0 means Never auto-delete
+
+    const cutoffTimestamp = Date.now() - (days * 86400000);
+    const initialCount = this.state.orders.length;
+    
+    this.state.orders = this.state.orders.filter(order => {
+      const orderTime = order.timestamp || (new Date(order.date).getTime());
+      return orderTime ? orderTime >= cutoffTimestamp : true;
+    });
+
+    const purgedCount = initialCount - this.state.orders.length;
+    this.saveStorage('kreid_orders', this.state.orders);
+
+    if (purgedCount > 0) {
+      this.showToast(`Auto-purged ${purgedCount} order records older than ${days} days!`, 'info');
+      this.notify();
+    }
+    return purgedCount;
+  }
+
+  // Complete Wipe All Orders (with "DELETE" confirmation prompt)
+  wipeAllOrders() {
+    const count = this.state.orders.length;
+    this.state.orders = [];
+    this.saveStorage('kreid_orders', []);
+    this.showToast(`Permanently deleted all ${count} customer order records!`, 'info');
+    this.notify();
+    return count;
+  }
+
   // Complete Wipe All Data (with confirmation prompt)
   wipeAllWhatsAppLogs() {
     const count = this.state.whatsappLogs.length + this.state.whatsappFollowUps.length;
@@ -257,6 +289,7 @@ class AppStore {
     this.notify();
     return count;
   }
+
 
   // Helper to extract server base origin URL from API endpoint
   getServerBaseUrl() {

@@ -1,6 +1,6 @@
 /**
  * KREID Administrative Control Suite Dashboard
- * Integrated 24-hour live sales graph, live storefront order sync, WhatsApp Automation & Dual-Gateway Suite, coupon manager, and payment gateway account editor.
+ * Integrated 24-hour live sales graph, live storefront order sync, WhatsApp Automation & Dual-Gateway Suite, coupon manager, payment gateway account editor, custom retention auto-purge engine & "DELETE" confirmation wipe modal.
  */
 
 import { appStore } from '../store/appStore.js';
@@ -73,10 +73,15 @@ export function renderAdminDashboard(container, state) {
             </p>
           </div>
 
-          <div style="display: flex; gap: 0.8rem;">
+          <div style="display: flex; gap: 0.8rem; align-items: center;">
             ${activeTab === 'products' ? `
               <button class="btn btn-primary" id="btn-open-add-product-modal">
                 + Add New Product
+              </button>
+            ` : ''}
+            ${activeTab === 'orders' ? `
+              <button class="btn" id="btn-trigger-wipe-orders" style="background: rgba(230, 57, 70, 0.15); border: 1.5px solid var(--accent-neon); color: var(--accent-neon); font-weight: 800; padding: 0.6rem 1.1rem; border-radius: var(--radius-sm); cursor: pointer; transition: all 0.25s ease; box-shadow: 0 0 15px rgba(230,57,70,0.25);">
+                🗑️ WIPE ALL ORDERS DATA
               </button>
             ` : ''}
             ${activeTab === 'coupons' ? `
@@ -130,23 +135,83 @@ export function renderAdminDashboard(container, state) {
     openProductEditModal(container, state);
   });
 
-  // Add Coupon Button Trigger
-  container.querySelector('#btn-open-add-coupon-modal')?.addEventListener('click', () => {
-    openCouponCreateModal(container, state);
+  // Trigger Wipe Orders Confirmation Modal
+  const wipeOrdersTrigger = container.querySelector('#btn-trigger-wipe-orders');
+  const wipeOrdersOverlay = container.querySelector('#wipe-orders-confirm-modal-overlay');
+  const confirmWipeInput = container.querySelector('#input-confirm-wipe-orders-text');
+  const confirmWipeBtn = container.querySelector('#btn-confirm-wipe-orders');
+  const cancelWipeBtn = container.querySelector('#btn-cancel-wipe-orders');
+
+  wipeOrdersTrigger?.addEventListener('click', () => {
+    if (wipeOrdersOverlay) wipeOrdersOverlay.style.display = 'flex';
+    if (confirmWipeInput) {
+      confirmWipeInput.value = '';
+      confirmWipeInput.focus();
+    }
+    if (confirmWipeBtn) {
+      confirmWipeBtn.disabled = true;
+      confirmWipeBtn.style.background = '#555';
+      confirmWipeBtn.style.color = '#aaa';
+      confirmWipeBtn.style.cursor = 'not-allowed';
+    }
   });
 
-  // Attach Table Action Listeners
+  cancelWipeBtn?.addEventListener('click', () => {
+    if (wipeOrdersOverlay) wipeOrdersOverlay.style.display = 'none';
+  });
+
+  confirmWipeInput?.addEventListener('input', (e) => {
+    const val = e.target.value.trim();
+    if (val === 'DELETE') {
+      confirmWipeBtn.disabled = false;
+      confirmWipeBtn.style.background = 'var(--accent-neon)';
+      confirmWipeBtn.style.color = '#ffffff';
+      confirmWipeBtn.style.cursor = 'pointer';
+      confirmWipeBtn.style.boxShadow = '0 0 15px rgba(230,57,70,0.5)';
+    } else {
+      confirmWipeBtn.disabled = true;
+      confirmWipeBtn.style.background = '#555';
+      confirmWipeBtn.style.color = '#aaa';
+      confirmWipeBtn.style.cursor = 'not-allowed';
+      confirmWipeBtn.style.boxShadow = 'none';
+    }
+  });
+
+  confirmWipeBtn?.addEventListener('click', () => {
+    appStore.wipeAllOrders();
+    if (wipeOrdersOverlay) wipeOrdersOverlay.style.display = 'none';
+    renderAdminDashboard(container, appStore.state);
+  });
+
+  // Save Retention & Purge Form
+  const retentionForm = container.querySelector('#order-retention-form');
+  retentionForm?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const daysInput = container.querySelector('#input-order-retention-days');
+    const days = parseInt(daysInput ? daysInput.value : '30') || 0;
+    appStore.state.orderRetentionDays = days;
+    appStore.saveStorage('kreid_order_retention_days', days);
+    appStore.purgeOldOrders(days);
+    renderAdminDashboard(container, appStore.state);
+  });
+
+  // Add Coupon Button Trigger
+  container.querySelector('#btn-open-add-coupon-modal')?.addEventListener('click', () => {
+    openCouponModal(container, state);
+  });
+
+  // Attach Table Action Listeners (Edit Product, Delete Product, Update Status, Payment Proof Modal)
   attachTableEventListeners(container, state);
 }
 
 function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowStockCount) {
   if (activeTab === 'dashboard') {
     return `
-      <!-- Metrics Grid -->
+      <!-- Metric Cards Grid -->
       <div class="metrics-grid">
         <div class="metric-card">
           <div>
-            <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase;">Total Gross Revenue</div>
+            <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase;">Total Storefront Sales</div>
             <div class="metric-value">PKR ${totalRevenue.toLocaleString()}</div>
           </div>
           <div class="metric-icon">💰</div>
@@ -246,7 +311,56 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
   }
 
   if (activeTab === 'orders') {
-    return renderOrdersTable(state.orders);
+    const retentionDays = state.orderRetentionDays !== undefined ? state.orderRetentionDays : 30;
+    return `
+      <!-- Order Retention Auto-Purge Control Bar -->
+      <div style="background: var(--bg-secondary); border: 1.5px solid var(--border-gold); border-radius: var(--radius-md); padding: 1.2rem; margin-bottom: 1.5rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+        <div style="display: flex; align-items: center; gap: 0.8rem;">
+          <span style="font-size: 1.4rem; color: var(--accent-gold);">🗓️</span>
+          <div>
+            <h4 style="color: var(--accent-gold); font-size: 0.98rem; margin-bottom: 0.15rem; font-weight: 800;">
+              ⏰ Auto-Delete Past Customer Order History Data
+            </h4>
+            <p style="font-size: 0.78rem; color: var(--text-muted); margin: 0;">
+              Specify custom days threshold to automatically purge old orders (Set 0 to never delete)
+            </p>
+          </div>
+        </div>
+
+        <form id="order-retention-form" style="display: flex; align-items: center; gap: 0.8rem; flex-wrap: wrap;">
+          <label style="font-size: 0.85rem; color: #fff;">Purge orders older than:</label>
+          <input type="number" id="input-order-retention-days" min="0" max="365" value="${retentionDays}" style="width: 85px; padding: 0.45rem; background: var(--bg-primary); border: 1.5px solid var(--border-gold); color: #fff; border-radius: var(--radius-sm); font-weight: 800; text-align: center;" />
+          <span style="font-size: 0.85rem; color: var(--text-muted);">Days</span>
+          <button type="submit" class="btn btn-primary" style="font-size: 0.8rem; padding: 0.45rem 1rem;">
+            💾 Save Retention Rule & Purge Now
+          </button>
+        </form>
+      </div>
+
+      <!-- Main Order Fulfillment Table -->
+      ${renderOrdersTable(state.orders)}
+
+      <!-- High-Contrast Confirmation Modal for Wiping Orders -->
+      <div id="wipe-orders-confirm-modal-overlay" class="modal-backdrop" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0,0,0,0.85); backdrop-filter: blur(12px); z-index: 10000; justify-content: center; align-items: center; padding: 1rem;">
+        <div style="background: var(--bg-card); border: 2px solid var(--accent-neon); border-radius: var(--radius-md); width: 100%; max-width: 480px; padding: 2rem; box-shadow: 0 0 40px rgba(230,57,70,0.4); text-align: center;">
+          <div style="font-size: 2.8rem; color: var(--accent-neon); margin-bottom: 0.5rem;">⚠️</div>
+          <h3 style="color: #ffffff; font-size: 1.3rem; font-weight: 800; margin-bottom: 0.6rem;">PERMANENTLY WIPE ALL ORDER DATA?</h3>
+          <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.4rem; line-height: 1.5;">
+            This action will permanently delete all customer orders (${state.orders.length} records) from local storage. This action <strong>cannot be undone</strong>!
+          </p>
+          <div style="background: var(--bg-secondary); border: 1px solid var(--border-light); padding: 0.8rem; border-radius: var(--radius-sm); margin-bottom: 1.2rem;">
+            <label style="font-size: 0.82rem; color: var(--accent-gold); display: block; margin-bottom: 0.4rem; font-weight: 700;">
+              Type "DELETE" below to confirm wiping:
+            </label>
+            <input type="text" id="input-confirm-wipe-orders-text" placeholder="DELETE" style="width: 100%; text-align: center; padding: 0.6rem; background: var(--bg-primary); border: 1.5px solid var(--border-gold); color: #ffffff; font-weight: 800; font-size: 1rem; border-radius: 4px; outline: none; letter-spacing: 0.1em;" />
+          </div>
+          <div style="display: flex; gap: 0.8rem;">
+            <button class="btn btn-secondary" id="btn-cancel-wipe-orders" style="flex: 1; padding: 0.7rem;">Cancel</button>
+            <button class="btn" id="btn-confirm-wipe-orders" disabled style="flex: 1; padding: 0.7rem; background: #555; color: #aaa; cursor: not-allowed; font-weight: 700; border: none; transition: all 0.2s ease;">Confirm Delete</button>
+          </div>
+        </div>
+      </div>
+    `;
   }
 
   if (activeTab === 'coupons') {
@@ -257,7 +371,7 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
             <tr>
               <th>Coupon Code</th>
               <th>Discount Type</th>
-              <th>Minimum Spend</th>
+              <th>Min Spend</th>
               <th>Status</th>
               <th>Actions</th>
             </tr>
@@ -265,20 +379,24 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
           <tbody>
             ${state.coupons.map(c => `
               <tr>
-                <td><strong style="color: var(--accent-gold); font-size: 1.05rem;">${c.code}</strong></td>
-                <td>${c.freeShipping ? 'FREE Shipping' : `${c.discountPercent}% OFF`}</td>
+                <td>
+                  <strong style="color: var(--accent-gold); font-size: 1.05rem; font-family: monospace;">${c.code}</strong>
+                </td>
+                <td>
+                  ${c.freeShipping ? '🚀 Free Shipping' : `💰 ${c.discountPercent}% OFF`}
+                </td>
                 <td>PKR ${c.minSpend.toLocaleString()}</td>
                 <td>
-                  <span class="badge ${c.isActive ? 'badge-green' : 'badge-red'}">
-                    ${c.isActive ? 'ACTIVE' : 'DEACTIVATED'}
+                  <span class="badge ${c.isActive ? 'badge-green' : 'badge-gold'}">
+                    ${c.isActive ? 'Active' : 'Disabled'}
                   </span>
                 </td>
                 <td>
                   <button class="btn btn-secondary btn-toggle-coupon" data-code="${c.code}" style="padding: 0.4rem 0.8rem; font-size: 0.78rem;">
-                    ${c.isActive ? '🔒 Deactivate' : '🔓 Activate'}
+                    ${c.isActive ? 'Disable' : 'Activate'}
                   </button>
                   <button class="btn btn-outline-gold btn-delete-coupon" data-code="${c.code}" style="padding: 0.4rem 0.8rem; font-size: 0.78rem; color: var(--accent-neon);">
-                    🗑️ Remove
+                    🗑️ Delete
                   </button>
                 </td>
               </tr>
@@ -290,139 +408,165 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
   }
 
   if (activeTab === 'settings') {
-    const p = state.paymentSettings;
+    const pay = state.paymentSettings;
     return `
-      <div style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 2rem; border-radius: var(--radius-md); max-width: 800px;">
-        <h3 style="font-size: 1.2rem; color: var(--accent-gold); margin-bottom: 1.5rem;">💳 Storefront Payment Accounts & Logistics Settings</h3>
-        
-        <form id="payment-settings-form">
-          <div style="border-bottom: 1px dashed var(--border-light); padding-bottom: 1rem; margin-bottom: 1.2rem;">
-            <h4 style="color: #fff; margin-bottom: 0.8rem;">1. JazzCash Account Details</h4>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+      <div style="max-width: 800px; display: flex; flex-direction: column; gap: 1.5rem;">
+        <div style="background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.5rem;">
+          <h3 style="color: var(--accent-gold); font-size: 1.1rem; margin-bottom: 1rem;">📱 JazzCash Account Settings</h3>
+          <form id="jazzcash-settings-form">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
               <div class="form-group">
-                <label class="form-label">JazzCash Account Title</label>
-                <input type="text" name="jazzcashTitle" class="form-input" value="${p.jazzcash.title}" />
+                <label class="form-label">Account Title</label>
+                <input type="text" name="jazzcashTitle" value="${pay.jazzcash.title}" class="form-input" required />
               </div>
               <div class="form-group">
                 <label class="form-label">JazzCash Mobile Number</label>
-                <input type="text" name="jazzcashNumber" class="form-input" value="${p.jazzcash.number}" />
+                <input type="text" name="jazzcashNumber" value="${pay.jazzcash.number}" class="form-input" required />
               </div>
             </div>
-          </div>
+            <button type="submit" class="btn btn-primary" style="padding: 0.6rem 1.2rem; font-size: 0.85rem;">
+              Save JazzCash Settings
+            </button>
+          </form>
+        </div>
 
-          <div style="border-bottom: 1px dashed var(--border-light); padding-bottom: 1rem; margin-bottom: 1.2rem;">
-            <h4 style="color: #fff; margin-bottom: 0.8rem;">2. EasyPaisa Account Details</h4>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div style="background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.5rem;">
+          <h3 style="color: var(--accent-gold); font-size: 1.1rem; margin-bottom: 1rem;">📲 EasyPaisa Account Settings</h3>
+          <form id="easypaisa-settings-form">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
               <div class="form-group">
-                <label class="form-label">EasyPaisa Account Title</label>
-                <input type="text" name="easypaisaTitle" class="form-input" value="${p.easypaisa.title}" />
+                <label class="form-label">Account Title</label>
+                <input type="text" name="easypaisaTitle" value="${pay.easypaisa.title}" class="form-input" required />
               </div>
               <div class="form-group">
                 <label class="form-label">EasyPaisa Mobile Number</label>
-                <input type="text" name="easypaisaNumber" class="form-input" value="${p.easypaisa.number}" />
+                <input type="text" name="easypaisaNumber" value="${pay.easypaisa.number}" class="form-input" required />
               </div>
             </div>
-          </div>
+            <button type="submit" class="btn btn-primary" style="padding: 0.6rem 1.2rem; font-size: 0.85rem;">
+              Save EasyPaisa Settings
+            </button>
+          </form>
+        </div>
 
-          <div style="border-bottom: 1px dashed var(--border-light); padding-bottom: 1rem; margin-bottom: 1.2rem;">
-            <h4 style="color: #fff; margin-bottom: 0.8rem;">3. SadaPay / NayaPay Account Details</h4>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-              <div class="form-group">
-                <label class="form-label">SadaPay Account Title</label>
-                <input type="text" name="sadapayTitle" class="form-input" value="${p.sadapay.title}" />
-              </div>
-              <div class="form-group">
-                <label class="form-label">SadaPay Number</label>
-                <input type="text" name="sadapayNumber" class="form-input" value="${p.sadapay.number}" />
-              </div>
-            </div>
-          </div>
-
-          <div style="margin-bottom: 1.5rem;">
-            <h4 style="color: #fff; margin-bottom: 0.8rem;">4. Pakistani Bank Account Details</h4>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div style="background: var(--bg-card); border: 1px solid var(--border-light); border-radius: var(--radius-md); padding: 1.5rem;">
+          <h3 style="color: var(--accent-gold); font-size: 1.1rem; margin-bottom: 1rem;">🏦 Pakistani Bank Transfer Settings</h3>
+          <form id="bank-settings-form">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
               <div class="form-group">
                 <label class="form-label">Bank Name</label>
-                <input type="text" name="bankName" class="form-input" value="${p.bank.bankName}" />
+                <input type="text" name="bankName" value="${pay.bank.bankName}" class="form-input" required />
               </div>
               <div class="form-group">
                 <label class="form-label">Account Title</label>
-                <input type="text" name="bankTitle" class="form-input" value="${p.bank.title}" />
+                <input type="text" name="bankTitle" value="${pay.bank.title}" class="form-input" required />
+              </div>
+              <div class="form-group">
+                <label class="form-label">IBAN Number</label>
+                <input type="text" name="bankIban" value="${pay.bank.iban}" class="form-input" required />
               </div>
             </div>
-            <div class="form-group">
-              <label class="form-label">IBAN Number</label>
-              <input type="text" name="bankIban" class="form-input" value="${p.bank.iban}" />
-            </div>
-          </div>
-
-          <button type="submit" class="btn btn-primary" style="width: 100%;">
-            💾 Save Payment Accounts & Details
-          </button>
-        </form>
+            <button type="submit" class="btn btn-primary" style="padding: 0.6rem 1.2rem; font-size: 0.85rem;">
+              Save Bank Details
+            </button>
+          </form>
+        </div>
       </div>
     `;
   }
 }
 
-/* Dynamic 24 Individual 1-Hour Interval Sales SVG Graph Builder (1h, 2h, 3h ... 24h) */
+/**
+ * Renders SVG 24-Hour (1h to 24h) Hourly Sales Performance Line Chart
+ */
 function render24HourSVGChart(orders) {
-  const hourlySlots = Array(24).fill(0);
+  const hourlyData = Array(24).fill(0);
+  const now = Date.now();
+  const oneDayAgo = now - 24 * 3600 * 1000;
 
-  orders.forEach(o => {
-    if (o.status === 'Cancelled') return;
-    const hour = o.timestamp ? new Date(o.timestamp).getHours() : 12;
-    hourlySlots[hour] += o.total;
+  orders.forEach(order => {
+    if (order.status === 'Cancelled') return;
+    const orderTime = order.timestamp || (new Date(order.date).getTime());
+    if (orderTime >= oneDayAgo) {
+      const hoursAgo = Math.floor((now - orderTime) / (3600 * 1000));
+      if (hoursAgo >= 0 && hoursAgo < 24) {
+        const hourIndex = 23 - hoursAgo;
+        hourlyData[hourIndex] += order.total;
+      }
+    }
   });
 
-  const maxVal = Math.max(...hourlySlots, 8000);
-  const width = 1100;
-  const height = 180;
+  const maxVal = Math.max(...hourlyData, 10000);
+  const chartHeight = 180;
+  const chartWidth = 900;
   const paddingX = 40;
+  const paddingY = 20;
 
-  const points = hourlySlots.map((val, hour) => {
-    const x = paddingX + (hour / 23) * (width - 2 * paddingX);
-    const y = height - 30 - (val / maxVal) * (height - 60);
-    return { x, y, val, hour };
+  const points = hourlyData.map((val, idx) => {
+    const x = paddingX + (idx / 23) * (chartWidth - paddingX * 2);
+    const y = chartHeight - paddingY - (val / maxVal) * (chartHeight - paddingY * 2);
+    return `${x},${y}`;
+  }).join(' ');
+
+  const currentHour = new Date().getHours();
+  const labels = Array(24).fill(0).map((_, idx) => {
+    const hour = (currentHour - (23 - idx) + 24) % 24;
+    return `${hour.toString().padStart(2, '0')}:00`;
   });
-
-  const pathD = `M ${paddingX},${height - 30} ` + points.map(p => `L ${p.x},${p.y}`).join(' ') + ` L ${width - paddingX},${height - 30} Z`;
-  const strokeD = `M ${points[0].x},${points[0].y} ` + points.slice(1).map(p => `L ${p.x},${p.y}`).join(' ');
 
   return `
-    <div style="overflow-x: auto; padding-bottom: 0.5rem;">
-      <svg class="svg-chart" viewBox="0 0 ${width} ${height + 30}" style="min-width: 900px;">
-        <line x1="${paddingX}" y1="30" x2="${width - paddingX}" y2="30" stroke="rgba(255,255,255,0.06)" stroke-width="1" />
-        <line x1="${paddingX}" y1="80" x2="${width - paddingX}" y2="80" stroke="rgba(255,255,255,0.06)" stroke-width="1" />
-        <line x1="${paddingX}" y1="130" x2="${width - paddingX}" y2="130" stroke="rgba(255,255,255,0.06)" stroke-width="1" />
-
-        <path d="${pathD}" fill="url(#live-chart-grad-24)" />
-        <path d="${strokeD}" fill="none" stroke="#d4af37" stroke-width="3" filter="drop-shadow(0 0 6px rgba(212,175,55,0.6))" />
-
-        ${points.map((p) => `
-          <circle cx="${p.x}" cy="${p.y}" r="4" fill="#0a0a0d" stroke="#d4af37" stroke-width="2" />
-          ${p.val > 0 ? `
-            <text x="${p.x}" y="${p.y - 8}" fill="#ffffff" font-size="10" font-weight="700" text-anchor="middle">
-              PKR ${(p.val / 1000).toFixed(1)}k
-            </text>
-          ` : ''}
-          <text x="${p.x}" y="${height + 15}" fill="#a0a0b0" font-size="10" text-anchor="middle">
-            ${p.hour + 1}h
-          </text>
-        `).join('')}
-
+    <div style="width: 100%; overflow-x: auto;">
+      <svg viewBox="0 0 ${chartWidth} ${chartHeight + 35}" style="width: 100%; height: auto; min-width: 600px; background: rgba(0,0,0,0.3); border-radius: var(--radius-sm); border: 1px solid var(--border-light);">
         <defs>
-          <linearGradient id="live-chart-grad-24" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stop-color="#d4af37" stop-opacity="0.4" />
-            <stop offset="100%" stop-color="#d4af37" stop-opacity="0" />
+          <linearGradient id="salesGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--accent-gold)" stop-opacity="0.4" />
+            <stop offset="100%" stop-color="var(--accent-gold)" stop-opacity="0.0" />
           </linearGradient>
         </defs>
+
+        <polyline
+          fill="url(#salesGrad)"
+          stroke="none"
+          points="${paddingX},${chartHeight - paddingY} ${points} ${chartWidth - paddingX},${chartHeight - paddingY}"
+        />
+
+        <polyline
+          fill="none"
+          stroke="var(--accent-gold)"
+          stroke-width="3"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          points="${points}"
+        />
+
+        ${hourlyData.map((val, idx) => {
+          const x = paddingX + (idx / 23) * (chartWidth - paddingX * 2);
+          const y = chartHeight - paddingY - (val / maxVal) * (chartHeight - paddingY * 2);
+          return `
+            <circle cx="${x}" cy="${y}" r="4" fill="var(--accent-gold)" stroke="#000" stroke-width="1.5" />
+            ${idx % 3 === 0 ? `
+              <text x="${x}" y="${chartHeight + 20}" fill="var(--text-muted)" font-size="10" text-anchor="middle" font-family="sans-serif">
+                ${labels[idx]}
+              </text>
+            ` : ''}
+          `;
+        }).join('')}
       </svg>
     </div>
   `;
 }
 
 function renderOrdersTable(orders) {
+  if (!orders || orders.length === 0) {
+    return `
+      <div style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 3rem; text-align: center; border-radius: var(--radius-md);">
+        <div style="font-size: 2.5rem; margin-bottom: 0.5rem;">📦</div>
+        <h4 style="color: #fff; font-size: 1.1rem;">No orders received yet</h4>
+        <p style="font-size: 0.85rem; color: var(--text-muted);">Storefront customer orders will appear here automatically in real time.</p>
+      </div>
+    `;
+  }
+
   return `
     <div class="admin-table-wrap">
       <table class="admin-table">
@@ -439,38 +583,36 @@ function renderOrdersTable(orders) {
           </tr>
         </thead>
         <tbody>
-          ${orders.length === 0 ? `
-            <tr>
-              <td colspan="8" style="text-align: center; color: var(--text-muted); padding: 2rem;">
-                No storefront orders received yet.
-              </td>
-            </tr>
-          ` : orders.map(o => `
+          ${orders.map(o => `
             <tr>
               <td>
-                <strong style="color: #ffffff; font-size: 0.95rem;">#${o.id}</strong>
+                <strong style="color: #ffffff; font-size: 0.95rem; font-family: monospace;">#${o.id}</strong>
                 <div style="font-size: 0.75rem; color: var(--accent-gold);">${o.trackingNo}</div>
               </td>
               <td>
-                <strong style="color: #ffffff;">${o.customerName}</strong>
+                <strong style="color: #fff; font-size: 0.9rem;">${o.customerName}</strong>
                 <div style="font-size: 0.78rem; color: var(--text-muted);">${o.phone}</div>
               </td>
               <td>
-                <strong style="color: #ffffff;">${o.city}</strong>
-                <div style="font-size: 0.75rem; color: var(--text-muted);">${o.address}</div>
+                <strong style="color: #fff; font-size: 0.88rem;">${o.city}</strong>
+                <div style="font-size: 0.75rem; color: var(--text-muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${o.address}</div>
               </td>
-              <td><span class="badge badge-gold">${o.courier}</span></td>
-              <td><strong style="color: #ffffff;">PKR ${o.total.toLocaleString()}</strong></td>
               <td>
-                <div style="font-size: 0.8rem; font-weight: 700; color: var(--accent-gold);">${o.paymentMethod}</div>
+                <span class="badge badge-gold" style="font-weight: 700;">${o.courier ? o.courier.toUpperCase() : 'TRAX'}</span>
+              </td>
+              <td>
+                <strong style="color: var(--accent-gold); font-size: 1.05rem;">PKR ${o.total.toLocaleString()}</strong>
+              </td>
+              <td>
+                <div style="font-size: 0.82rem; color: #fff;">${o.paymentMethod}</div>
                 ${o.paymentProof ? `
-                  <button class="btn btn-outline-gold btn-view-proof" data-id="${o.id}" style="padding: 0.2rem 0.5rem; font-size: 0.7rem; margin-top: 0.3rem;">
-                    📷 View Proof
+                  <button class="btn btn-secondary btn-view-proof" data-proof="${o.paymentProof}" data-id="${o.id}" style="padding: 0.2rem 0.6rem; font-size: 0.72rem; margin-top: 0.3rem;">
+                    🖼️ View Proof
                   </button>
-                ` : '<span style="font-size: 0.72rem; color: var(--text-muted);">No Proof File</span>'}
+                ` : `<span style="font-size: 0.72rem; color: var(--text-muted);">No Proof File</span>`}
               </td>
               <td>
-                <select class="form-select admin-order-status-select" data-id="${o.id}" style="padding: 0.35rem 0.6rem; font-size: 0.8rem;">
+                <select class="form-select order-status-select" data-id="${o.id}" style="padding: 0.3rem 0.5rem; font-size: 0.8rem; background: var(--bg-primary); color: #fff; border: 1px solid var(--border-gold); border-radius: 4px;">
                   <option value="Processing" ${o.status === 'Processing' ? 'selected' : ''}>Processing</option>
                   <option value="Shipped" ${o.status === 'Shipped' ? 'selected' : ''}>Shipped</option>
                   <option value="Delivered" ${o.status === 'Delivered' ? 'selected' : ''}>Delivered</option>
@@ -478,7 +620,7 @@ function renderOrdersTable(orders) {
                 </select>
               </td>
               <td>
-                <button class="btn btn-secondary btn-view-order-details" data-id="${o.id}" style="padding: 0.35rem 0.7rem; font-size: 0.78rem;">
+                <button class="btn btn-secondary btn-print-slip" data-id="${o.id}" style="padding: 0.35rem 0.7rem; font-size: 0.75rem;">
                   📄 Slip
                 </button>
               </td>
@@ -491,433 +633,220 @@ function renderOrdersTable(orders) {
 }
 
 function attachTableEventListeners(container, state) {
-  // Save Payment Settings Form
-  const payForm = container.querySelector('#payment-settings-form');
-  if (payForm) {
-    payForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      const fd = new FormData(payForm);
-      appStore.savePaymentSettings({
-        jazzcash: { title: fd.get('jazzcashTitle'), number: fd.get('jazzcashNumber') },
-        easypaisa: { title: fd.get('easypaisaTitle'), number: fd.get('easypaisaNumber') },
-        sadapay: { title: fd.get('sadapayTitle'), number: fd.get('sadapayNumber') },
-        bank: { bankName: fd.get('bankName'), title: fd.get('bankTitle'), iban: fd.get('bankIban') }
-      });
-    });
-  }
-
-  // Toggle Coupon Status
-  container.querySelectorAll('.btn-toggle-coupon').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const code = btn.dataset.code;
-      appStore.toggleCouponStatus(code);
-      renderAdminDashboard(container, appStore.state);
-    });
-  });
-
-  // Delete Coupon
-  container.querySelectorAll('.btn-delete-coupon').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const code = btn.dataset.code;
-      if (confirm(`Remove coupon code ${code}?`)) {
-        appStore.deleteCoupon(code);
-        renderAdminDashboard(container, appStore.state);
-      }
-    });
-  });
-
-  // Order Status Change
-  container.querySelectorAll('.admin-order-status-select').forEach(sel => {
-    sel.addEventListener('change', (e) => {
-      const orderId = sel.dataset.id;
+  // Update Order Status
+  container.querySelectorAll('.order-status-select').forEach(select => {
+    select.addEventListener('change', (e) => {
+      const orderId = select.dataset.id;
       const newStatus = e.target.value;
       appStore.updateOrderStatus(orderId, newStatus);
     });
   });
 
-  // View Payment Proof
+  // View Payment Proof Modal
   container.querySelectorAll('.btn-view-proof').forEach(btn => {
     btn.addEventListener('click', () => {
+      const proofSrc = btn.dataset.proof;
       const orderId = btn.dataset.id;
-      const order = state.orders.find(o => o.id === orderId);
-      if (order && order.paymentProof) {
-        openPaymentProofModal(container, order);
+      const proofRoot = container.querySelector('#admin-proof-modal-root');
+      if (proofRoot) {
+        proofRoot.classList.add('active');
+        proofRoot.innerHTML = `
+          <div class="modal-card" style="max-width: 600px; padding: 2rem; background: var(--bg-card); border: 1.5px solid var(--accent-gold); border-radius: var(--radius-md);">
+            <button class="modal-close-btn" id="btn-close-proof">✕</button>
+            <h3 style="color: var(--accent-gold); margin-bottom: 1rem;">📸 Payment Transfer Proof Screenshot (Order #${orderId})</h3>
+            <div style="background: #000; padding: 1rem; border-radius: var(--radius-sm); text-align: center;">
+              <img src="${proofSrc}" alt="Payment Proof" style="max-width: 100%; max-height: 70vh; object-fit: contain; border-radius: 6px; border: 1px solid var(--border-gold);" />
+            </div>
+            <div style="margin-top: 1rem; text-align: right;">
+              <button class="btn btn-primary" id="btn-close-proof-footer">Done</button>
+            </div>
+          </div>
+        `;
+
+        proofRoot.querySelector('#btn-close-proof')?.addEventListener('click', () => proofRoot.classList.remove('active'));
+        proofRoot.querySelector('#btn-close-proof-footer')?.addEventListener('click', () => proofRoot.classList.remove('active'));
       }
     });
   });
 
-  // Edit Product
-  container.querySelectorAll('.btn-edit-product').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const prodId = btn.dataset.id;
-      editingProduct = state.products.find(p => p.id === prodId);
-      uploadedImages = editingProduct ? [...editingProduct.images] : [];
-      openProductEditModal(container, state);
-    });
-  });
-
-  // Delete Product
+  // Delete Product Trigger
   container.querySelectorAll('.btn-delete-product').forEach(btn => {
     btn.addEventListener('click', () => {
-      const prodId = btn.dataset.id;
-      if (confirm("Are you sure you want to delete this item from the catalog?")) {
-        appStore.deleteProduct(prodId);
+      const id = btn.dataset.id;
+      if (confirm(`Are you sure you want to delete product SKU: ${id}?`)) {
+        appStore.deleteProduct(id);
         renderAdminDashboard(container, appStore.state);
       }
     });
   });
 
-  // View Order Slip
-  container.querySelectorAll('.btn-view-order-details').forEach(btn => {
+  // Edit Product Trigger
+  container.querySelectorAll('.btn-edit-product').forEach(btn => {
     btn.addEventListener('click', () => {
-      const orderId = btn.dataset.id;
-      const order = state.orders.find(o => o.id === orderId);
-      if (order) {
-        openOrderSlipModal(container, order);
+      const id = btn.dataset.id;
+      editingProduct = state.products.find(p => p.id === id);
+      uploadedImages = editingProduct ? [...(editingProduct.images || [])] : [];
+      openProductEditModal(container, state);
+    });
+  });
+
+  // Toggle & Delete Coupons
+  container.querySelectorAll('.btn-toggle-coupon').forEach(btn => {
+    btn.addEventListener('click', () => {
+      appStore.toggleCoupon(btn.dataset.code);
+      renderAdminDashboard(container, appStore.state);
+    });
+  });
+
+  container.querySelectorAll('.btn-delete-coupon').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (confirm(`Delete coupon code ${btn.dataset.code}?`)) {
+        appStore.deleteCoupon(btn.dataset.code);
+        renderAdminDashboard(container, appStore.state);
       }
     });
   });
 }
 
-/* Coupon Creation Modal */
-function openCouponCreateModal(container, state) {
-  const modalRoot = container.querySelector('#admin-coupon-modal-root');
-  if (!modalRoot) return;
-
-  modalRoot.classList.add('active');
-
-  modalRoot.innerHTML = `
-    <div class="checkout-modal-card" style="max-width: 500px;">
-      <button class="modal-close-btn" id="btn-close-coupon-modal">✕</button>
-
-      <h2 style="font-size: 1.5rem; margin-bottom: 0.3rem;">🎟️ Create Discount Coupon</h2>
-      <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.2rem;">
-        Add a new promotional promo code for customers.
-      </p>
-
-      <form id="coupon-form">
-        <div class="form-group">
-          <label class="form-label">Coupon Code *</label>
-          <input type="text" name="code" required class="form-input" placeholder="e.g. SUMMER20" style="text-transform: uppercase;" />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Discount Percentage (%) *</label>
-          <input type="number" name="discountPercent" required class="form-input" placeholder="e.g. 15" />
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">Minimum Spend (PKR)</label>
-          <input type="number" name="minSpend" class="form-input" placeholder="e.g. 3000" value="2000" />
-        </div>
-
-        <button type="submit" class="btn btn-primary" style="width: 100%;">
-          ⚡ Publish Coupon Code
-        </button>
-      </form>
-    </div>
-  `;
-
-  modalRoot.querySelector('#btn-close-coupon-modal').addEventListener('click', () => {
-    modalRoot.classList.remove('active');
-  });
-
-  const form = modalRoot.querySelector('#coupon-form');
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const fd = new FormData(form);
-    appStore.saveCoupon({
-      code: fd.get('code'),
-      discountPercent: parseInt(fd.get('discountPercent')),
-      minSpend: parseInt(fd.get('minSpend')) || 0
-    });
-    modalRoot.classList.remove('active');
-    renderAdminDashboard(container, appStore.state);
-  });
-}
-
-/* Payment Proof Inspector Modal */
-function openPaymentProofModal(container, order) {
-  const modalRoot = container.querySelector('#admin-proof-modal-root');
-  if (!modalRoot) return;
-
-  modalRoot.classList.add('active');
-
-  modalRoot.innerHTML = `
-    <div class="checkout-modal-card" style="max-width: 550px; text-align: center;">
-      <button class="modal-close-btn" id="btn-close-proof-modal">✕</button>
-
-      <h2 style="font-size: 1.4rem; margin-bottom: 0.3rem;">📷 Payment Proof Screenshot</h2>
-      <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.2rem;">
-        Order #${order.id} | ${order.customerName} (${order.paymentMethod})
-      </p>
-
-      <div style="background: #000; padding: 1rem; border-radius: var(--radius-md); border: 1px solid var(--border-gold); margin-bottom: 1rem;">
-        <img src="${order.paymentProof}" alt="Payment Proof" style="max-width: 100%; max-height: 60vh; object-fit: contain; border-radius: var(--radius-sm);" />
-      </div>
-
-      <button class="btn btn-primary" id="btn-proof-verify-ok" style="width: 100%;">
-        ✓ Close Inspector
-      </button>
-    </div>
-  `;
-
-  modalRoot.querySelector('#btn-close-proof-modal').addEventListener('click', () => {
-    modalRoot.classList.remove('active');
-  });
-
-  modalRoot.querySelector('#btn-proof-verify-ok').addEventListener('click', () => {
-    modalRoot.classList.remove('active');
-  });
-}
-
-/* Rich Add / Edit Product Modal Dialog with File Reader Upload */
 function openProductEditModal(container, state) {
-  const modalRoot = container.querySelector('#admin-product-modal-root');
-  if (!modalRoot) return;
+  const root = container.querySelector('#admin-product-modal-root');
+  if (!root) return;
 
   const isEdit = !!editingProduct;
   const prod = editingProduct || {
-    name: '',
-    model: '',
-    category: 'shoes',
-    price: 4500,
-    originalPrice: 5500,
-    stock: 15,
-    description: '',
-    features: ['Premium Quality Material', 'Durable Construction', 'Ideal for daily wear'],
-    sizes: ['39', '40', '41', '42', '43', '44'],
-    images: []
+    name: '', category: 'shoes', price: '', originalPrice: '', stock: 20, color: '', sizes: ['M', 'L'], description: ''
   };
 
-  modalRoot.classList.add('active');
-
-  modalRoot.innerHTML = `
-    <div class="checkout-modal-card" style="max-width: 750px;">
+  root.classList.add('active');
+  root.innerHTML = `
+    <div class="modal-card" style="max-width: 650px; padding: 2rem; background: var(--bg-card); border: 1.5px solid var(--accent-gold); border-radius: var(--radius-md);">
       <button class="modal-close-btn" id="btn-close-prod-modal">✕</button>
-
-      <h2 style="font-size: 1.6rem; margin-bottom: 0.3rem;">
-        ${isEdit ? '✏️ Edit Product Details' : '✨ Add New Product to Catalog'}
+      <h2 style="font-size: 1.4rem; color: var(--accent-gold); margin-bottom: 1.5rem;">
+        ${isEdit ? '✏️ Edit Catalog Item' : '➕ Add New SKU Product'}
       </h2>
-      <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.5rem;">
-        Changes will immediately reflect on the KREID customer storefront.
-      </p>
 
-      <form id="product-modal-form">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-          <div class="form-group">
-            <label class="form-label">Product Title *</label>
-            <input type="text" name="name" required class="form-input" value="${prod.name}" placeholder="e.g. Nike Air Jordan 1 Low" />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Category *</label>
-            <select name="category" class="form-select">
-              <option value="shoes" ${prod.category === 'shoes' ? 'selected' : ''}>Shoes & Sneakers</option>
-              <option value="trousers" ${prod.category === 'trousers' ? 'selected' : ''}>Baggy Trousers</option>
-              <option value="tshirts" ${prod.category === 'tshirts' ? 'selected' : ''}>T-Shirts</option>
-              <option value="pants" ${prod.category === 'pants' ? 'selected' : ''}>Utility Pants</option>
-            </select>
-          </div>
+      <form id="admin-prod-form">
+        <div class="form-group">
+          <label class="form-label">Product Name *</label>
+          <input type="text" name="name" value="${prod.name}" required class="form-input" placeholder="e.g. Nike Air Jordan 1 Low" />
         </div>
 
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem;">
           <div class="form-group">
+            <label class="form-label">Category *</label>
+            <select name="category" class="form-select">
+              <option value="shoes" ${prod.category === 'shoes' ? 'selected' : ''}>Shoes</option>
+              <option value="tshirts" ${prod.category === 'tshirts' ? 'selected' : ''}>T-Shirts</option>
+              <option value="trousers" ${prod.category === 'trousers' ? 'selected' : ''}>Trousers</option>
+              <option value="pants" ${prod.category === 'pants' ? 'selected' : ''}>Pants</option>
+            </select>
+          </div>
+
+          <div class="form-group">
             <label class="form-label">Price (PKR) *</label>
-            <input type="number" name="price" required class="form-input" value="${prod.price}" />
+            <input type="number" name="price" value="${prod.price}" required class="form-input" />
           </div>
 
           <div class="form-group">
-            <label class="form-label">Original/Regular Price (PKR)</label>
-            <input type="number" name="originalPrice" class="form-input" value="${prod.originalPrice || ''}" />
-          </div>
-
-          <div class="form-group">
-            <label class="form-label">Stock Quantity *</label>
-            <input type="number" name="stock" required class="form-input" value="${prod.stock}" />
-          </div>
-        </div>
-
-        <!-- File Upload Drag & Drop Simulator -->
-        <div class="form-group">
-          <label class="form-label">Product Images (Upload File or Enter Image URL)</label>
-          <div class="file-upload-box" id="file-drop-zone">
-            <div style="font-size: 1.8rem; margin-bottom: 0.3rem;">📸</div>
-            <strong style="color: var(--accent-gold); font-size: 0.9rem;">Click to Select Local Image File</strong>
-            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.2rem;">Supports JPG, PNG, WEBP (Auto-converts to preview URL)</div>
-            <input type="file" id="file-input-element" accept="image/*" style="display: none;" />
-          </div>
-
-          <div style="margin-top: 0.8rem;">
-            <input type="url" id="image-url-fallback" class="form-input" placeholder="Or paste image URL (e.g. https://images.unsplash.com/...)" />
-          </div>
-
-          <div class="image-preview-grid" id="preview-grid">
-            ${uploadedImages.map(img => `
-              <div class="img-preview-item">
-                <img src="${img}" alt="Preview" />
-              </div>
-            `).join('')}
+            <label class="form-label">Stock Qty *</label>
+            <input type="number" name="stock" value="${prod.stock}" required class="form-input" />
           </div>
         </div>
 
         <div class="form-group">
-          <label class="form-label">Product Description</label>
-          <textarea name="description" class="form-input" rows="3" style="resize: vertical;">${prod.description}</textarea>
+          <label class="form-label">Main Image URL *</label>
+          <input type="url" name="imageUrl" value="${uploadedImages[0] || ''}" required class="form-input" placeholder="https://images.unsplash.com/..." />
         </div>
 
-        <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.9rem;">
-          ${isEdit ? '💾 Update Product' : '🚀 Publish Product to Catalog'}
-        </button>
+        <div class="form-group">
+          <label class="form-label">Description</label>
+          <textarea name="description" class="form-input" rows="3">${prod.description || ''}</textarea>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-prod-modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Product</button>
+        </div>
       </form>
     </div>
   `;
 
-  // Attach File Upload Event
-  const dropZone = modalRoot.querySelector('#file-drop-zone');
-  const fileInput = modalRoot.querySelector('#file-input-element');
-  const previewGrid = modalRoot.querySelector('#preview-grid');
-  const urlFallback = modalRoot.querySelector('#image-url-fallback');
+  root.querySelector('#btn-close-prod-modal')?.addEventListener('click', () => root.classList.remove('active'));
+  root.querySelector('#btn-cancel-prod-modal')?.addEventListener('click', () => root.classList.remove('active'));
 
-  dropZone.addEventListener('click', () => fileInput.click());
-
-  fileInput.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64Url = event.target.result;
-        uploadedImages.unshift(base64Url);
-        renderPreviewGrid();
-      };
-      reader.readAsDataURL(file);
-    }
-  });
-
-  urlFallback.addEventListener('change', (e) => {
-    if (e.target.value) {
-      uploadedImages.unshift(e.target.value);
-      renderPreviewGrid();
-      e.target.value = '';
-    }
-  });
-
-  function renderPreviewGrid() {
-    previewGrid.innerHTML = uploadedImages.map(img => `
-      <div class="img-preview-item">
-        <img src="${img}" alt="Preview" />
-      </div>
-    `).join('');
-  }
-
-  // Close Modal
-  modalRoot.querySelector('#btn-close-prod-modal').addEventListener('click', () => {
-    modalRoot.classList.remove('active');
-  });
-
-  // Submit Modal Form
-  const form = modalRoot.querySelector('#product-modal-form');
-  form.addEventListener('submit', (e) => {
+  const form = root.querySelector('#admin-prod-form');
+  form?.addEventListener('submit', (e) => {
     e.preventDefault();
-    const formData = new FormData(form);
-    
-    const finalImages = uploadedImages.length > 0 ? uploadedImages : [
-      'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=800&q=80'
-    ];
-
-    const updatedData = {
-      id: isEdit ? prod.id : undefined,
-      name: formData.get('name'),
-      category: formData.get('category'),
-      price: parseInt(formData.get('price')),
-      originalPrice: parseInt(formData.get('originalPrice')) || undefined,
-      stock: parseInt(formData.get('stock')),
-      description: formData.get('description'),
-      images: finalImages,
-      sizes: ['39', '40', '41', '42', '43', '44'],
-      inStock: parseInt(formData.get('stock')) > 0
+    const fd = new FormData(form);
+    const prodData = {
+      id: isEdit ? editingProduct.id : `prod-${Date.now()}`,
+      name: fd.get('name'),
+      category: fd.get('category'),
+      price: parseFloat(fd.get('price')),
+      stock: parseInt(fd.get('stock')),
+      images: [fd.get('imageUrl')],
+      description: fd.get('description'),
+      inStock: parseInt(fd.get('stock')) > 0
     };
 
-    appStore.saveProduct(updatedData);
-    modalRoot.classList.remove('active');
+    appStore.saveProduct(prodData);
+    root.classList.remove('active');
     renderAdminDashboard(container, appStore.state);
   });
 }
 
-/* Printable Shipping Consignment Slip Modal */
-function openOrderSlipModal(container, order) {
-  const modalRoot = container.querySelector('#admin-order-modal-root');
-  if (!modalRoot) return;
+function openCouponModal(container, state) {
+  const root = container.querySelector('#admin-coupon-modal-root');
+  if (!root) return;
 
-  modalRoot.classList.add('active');
+  root.classList.add('active');
+  root.innerHTML = `
+    <div class="modal-card" style="max-width: 500px; padding: 2rem; background: var(--bg-card); border: 1.5px solid var(--accent-gold); border-radius: var(--radius-md);">
+      <button class="modal-close-btn" id="btn-close-coupon-modal">✕</button>
+      <h2 style="font-size: 1.4rem; color: var(--accent-gold); margin-bottom: 1.5rem;">🎟️ Create Promo Coupon Code</h2>
 
-  modalRoot.innerHTML = `
-    <div class="checkout-modal-card" style="max-width: 600px; background: #ffffff; color: #000000;">
-      <button class="modal-close-btn" id="btn-close-order-slip" style="background: #eee; color: #000;">✕</button>
-
-      <div style="border-bottom: 2px solid #000; padding-bottom: 1rem; margin-bottom: 1rem; display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <h2 style="font-size: 1.5rem; color: #000;">KREID COUTURE</h2>
-          <div style="font-size: 0.8rem; color: #555;">CONSIGNMENT DISPATCH SLIP</div>
+      <form id="admin-coupon-form">
+        <div class="form-group">
+          <label class="form-label">Coupon Code *</label>
+          <input type="text" name="code" required class="form-input" placeholder="e.g. KREID20" style="text-transform: uppercase;" />
         </div>
-        <div style="text-align: right;">
-          <strong style="font-size: 1.1rem; color: #000;">${order.courier}</strong>
-          <div style="font-size: 0.85rem; font-family: monospace;">${order.trackingNo}</div>
-        </div>
-      </div>
 
-      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; font-size: 0.9rem; margin-bottom: 1rem; border-bottom: 1px dashed #ccc; padding-bottom: 1rem;">
-        <div>
-          <strong>CUSTOMER DETAILS:</strong>
-          <div>Name: ${order.customerName}</div>
-          <div>Phone: ${order.phone}</div>
-          <div>City: ${order.city}</div>
-          <div>Address: ${order.address}</div>
-        </div>
-        <div>
-          <strong>PAYMENT & ORDER:</strong>
-          <div>Order ID: #${order.id}</div>
-          <div>Date: ${order.date}</div>
-          <div>Payment: ${order.paymentMethod}</div>
-          <div style="font-weight: 800; font-size: 1.1rem; margin-top: 0.4rem;">TOTAL: PKR ${order.total.toLocaleString()}</div>
-        </div>
-      </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label class="form-label">Discount %</label>
+            <input type="number" name="discountPercent" value="15" min="1" max="100" class="form-input" />
+          </div>
 
-      <table style="width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 1.5rem;">
-        <thead>
-          <tr style="background: #eee;">
-            <th style="padding: 0.5rem; text-align: left;">Item</th>
-            <th style="padding: 0.5rem; text-align: center;">Size</th>
-            <th style="padding: 0.5rem; text-align: center;">Qty</th>
-            <th style="padding: 0.5rem; text-align: right;">Price</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${order.items.map(item => `
-            <tr style="border-bottom: 1px solid #eee;">
-              <td style="padding: 0.5rem;">${item.name}</td>
-              <td style="padding: 0.5rem; text-align: center;">${item.selectedSize}</td>
-              <td style="padding: 0.5rem; text-align: center;">${item.quantity}</td>
-              <td style="padding: 0.5rem; text-align: right;">PKR ${(item.price * item.quantity).toLocaleString()}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
-
-      ${order.paymentProof ? `
-        <div style="margin-bottom: 1rem; border: 1px solid #ccc; padding: 0.5rem; border-radius: 4px; text-align: center;">
-          <small style="display: block; font-weight: bold; margin-bottom: 0.3rem;">PAYMENT PROOF SCREENSHOT ATTACHED:</small>
-          <img src="${order.paymentProof}" style="max-height: 120px; object-fit: contain;" />
+          <div class="form-group">
+            <label class="form-label">Min Order PKR</label>
+            <input type="number" name="minSpend" value="3000" class="form-input" />
+          </div>
         </div>
-      ` : ''}
 
-      <button class="btn btn-primary" onclick="window.print()" style="width: 100%; background: #000; color: #fff;">
-        🖨️ Print Consignment Shipping Slip
-      </button>
+        <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
+          <button type="button" class="btn btn-secondary" id="btn-cancel-coupon-modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create Coupon</button>
+        </div>
+      </form>
     </div>
   `;
 
-  modalRoot.querySelector('#btn-close-order-slip').addEventListener('click', () => {
-    modalRoot.classList.remove('active');
+  root.querySelector('#btn-close-coupon-modal')?.addEventListener('click', () => root.classList.remove('active'));
+  root.querySelector('#btn-cancel-coupon-modal')?.addEventListener('click', () => root.classList.remove('active'));
+
+  const form = root.querySelector('#admin-coupon-form');
+  form?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const couponData = {
+      code: fd.get('code'),
+      discountPercent: parseFloat(fd.get('discountPercent')) || 0,
+      minSpend: parseFloat(fd.get('minSpend')) || 0,
+      isActive: true
+    };
+
+    appStore.saveCoupon(couponData);
+    root.classList.remove('active');
+    renderAdminDashboard(container, appStore.state);
   });
 }
