@@ -586,22 +586,22 @@ class AppStore {
   }
 
   getCartShippingFee(city = 'Lahore') {
-    const subtotal = this.getCartSubtotal();
-    if (subtotal >= 5000 || (this.state.activeCoupon && this.state.activeCoupon.freeShipping)) {
+    if (this.state.activeCoupon && this.state.activeCoupon.freeShipping) {
       return 0;
     }
+    const targetCity = city || 'Lahore';
     const cartItemsCount = this.state.cart.reduce((sum, item) => sum + item.quantity, 0);
-    const shipping = this.calculateShippingFee(city, cartItemsCount);
+    const shipping = this.calculateShippingFee(targetCity, cartItemsCount);
     return shipping.totalShippingFee;
   }
 
-
-  getCartTotal(city = null) {
+  getCartTotal(city = 'Lahore') {
     const subtotal = this.getCartSubtotal();
     const discount = this.getCartDiscount();
     const shipping = this.getCartShippingFee(city);
     return Math.max(0, subtotal - discount + shipping);
   }
+
 
   // Wishlist Actions
   toggleWishlist(product) {
