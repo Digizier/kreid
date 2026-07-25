@@ -1,6 +1,6 @@
 /**
  * KREID WhatsApp Automation Suite Component
- * High-Contrast Native SVG QR Code Matrix, Live Easypanel Server Integration & Automated Messaging Engine.
+ * Dynamic Baileys QR Code Data URL rendering, Official 8-Digit Pairing Code Generator & Easypanel Gateway Integration.
  */
 
 import { appStore } from '../store/appStore.js';
@@ -13,6 +13,10 @@ export function renderWhatsAppManager(container, state) {
   const logs = state.whatsappLogs || [];
 
   const defaultEasypanelEndpoint = "https://localhost-kreid-whatsapp-auto-message.1k6q7u.easypanel.host/api/whatsapp/send";
+
+  // Check if live QR image data URL exists from server
+  const liveQrSrc = waSession.qrImageDataUrl || null;
+  const rawQrData = waSession.qrString || `2@EASYPANEL-KREID-WA-PAIRING-${Date.now()}`;
 
   container.innerHTML = `
     <div style="display: flex; flex-direction: column; gap: 2rem; max-width: 1100px;">
@@ -27,7 +31,7 @@ export function renderWhatsAppManager(container, state) {
             </span>
           </div>
           <p style="color: var(--text-muted); font-size: 0.88rem;">
-            Linked Phone: <strong style="color: var(--accent-gold);">${waSession.linkedNumber}</strong> | Server: <span style="color: #ffffff; font-family: monospace;">${appStore.getServerBaseUrl()}</span>
+            Linked Phone: <strong style="color: var(--accent-gold);">${waSession.linkedNumber}</strong> | Host: <span style="color: #ffffff; font-family: monospace;">${appStore.getServerBaseUrl()}</span>
           </p>
         </div>
 
@@ -36,12 +40,12 @@ export function renderWhatsAppManager(container, state) {
             ${waSession.status === 'CONNECTED' ? '🔌 Re-Connect / Refresh Session' : '⚡ Connect WhatsApp Device'}
           </button>
           <button class="btn btn-secondary" id="btn-wa-gen-code">
-            🔑 Generate Live Pairing Code
+            🔑 Generate Live 8-Digit Pairing Code
           </button>
         </div>
       </div>
 
-      <!-- Native High-Contrast Scannable SVG QR Matrix & 8-Digit Pairing Code Box -->
+      <!-- Scannable Official Baileys QR Code & 8-Digit Pairing Code Box -->
       <div style="background: var(--bg-card); border: 1px dashed var(--accent-gold); padding: 2rem; border-radius: var(--radius-md); text-align: center;">
         <h4 style="color: var(--accent-gold); margin-bottom: 0.5rem; font-size: 1.15rem;">📷 Scan Live QR Code or Enter 8-Digit Pairing Code</h4>
         <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.5rem;">
@@ -49,9 +53,12 @@ export function renderWhatsAppManager(container, state) {
         </p>
 
         <div style="display: flex; justify-content: center; align-items: center; gap: 2.5rem; flex-wrap: wrap;">
-          <!-- High-Contrast Scannable Native SVG QR Matrix -->
+          <!-- Baileys Official QR Code Tile -->
           <div style="background: #ffffff; padding: 1.2rem; border-radius: var(--radius-md); box-shadow: 0 8px 30px rgba(0,0,0,0.5); border: 3px solid var(--accent-gold); display: inline-block;">
-            ${generateNativeSVGQRCode(waSession.qrString || '2@EASYPANEL-KREID-WA-PAIRING-SESSION')}
+            ${liveQrSrc 
+              ? `<img src="${liveQrSrc}" alt="Official Baileys QR Code" style="width: 200px; height: 200px; display: block;" />`
+              : generateNativeSVGQRCode(rawQrData)
+            }
             <div style="font-size: 0.75rem; color: #000000; font-weight: 800; margin-top: 0.6rem; letter-spacing: 0.05em;">SCAN WITH WHATSAPP CAMERA</div>
           </div>
 
