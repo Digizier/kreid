@@ -1,6 +1,6 @@
 /**
  * Product Card Component
- * Interactive product card with thumbnail preview, wishlist toggle, quick add, and detail modal trigger.
+ * Interactive mobile-optimized product card with high-res image preview, wishlist toggle, quick add, and detail modal trigger.
  */
 
 import { appStore } from '../store/appStore.js';
@@ -33,12 +33,13 @@ export function createProductCard(product) {
         ${product.originalPrice ? `<span class="original-price">PKR ${product.originalPrice.toLocaleString()}</span>` : ''}
       </div>
 
+      <!-- Mobile-Optimized Action Tray -->
       <div class="card-actions">
-        <button class="btn btn-secondary btn-quick-view" style="font-size: 0.8rem; padding: 0.6rem;">
-          View Details
+        <button class="btn btn-secondary btn-quick-view" title="Quick View Details">
+          👁️ <span class="btn-text-desktop">Details</span>
         </button>
-        <button class="btn btn-primary btn-add-cart" style="font-size: 0.8rem; padding: 0.6rem;">
-          + Add
+        <button class="btn btn-primary btn-add-cart" title="Add to Cart">
+          🛒 <span class="btn-text-full">+ Add to Cart</span>
         </button>
       </div>
     </div>
