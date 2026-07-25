@@ -1,6 +1,6 @@
 /**
  * KREID WhatsApp Automation Suite Component
- * Direct Live Easypanel PNG QR Code Image Streaming, Clickable Dynamic Tag Inserter & Custom Days Auto-Purge with "DELETE" Confirmation Modal.
+ * Direct Live Easypanel PNG QR Code Image Streaming, Clickable Dynamic Tag Inserter & Custom Dark Modal for "DELETE" Confirmation Wiping.
  */
 
 import { appStore } from '../store/appStore.js';
@@ -86,7 +86,7 @@ export function renderWhatsAppManager(container, state) {
         </div>
       </div>
 
-      <!-- Section 2: Primary WhatsApp Gateway & Data Retention Control (With Custom Days & Wipe Button) -->
+      <!-- Section 2: Primary WhatsApp Gateway & Data Retention Control -->
       <div style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 1.8rem; border-radius: var(--radius-md);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 1rem;">
           <div>
@@ -97,7 +97,7 @@ export function renderWhatsAppManager(container, state) {
             <button class="btn btn-secondary" id="btn-wa-purge-now" style="font-size: 0.8rem; padding: 0.5rem 0.9rem;">
               🧹 Purge Old Records (${waConfig.retentionDays || 30} Days)
             </button>
-            <button class="btn btn-outline-danger" id="btn-wa-wipe-all" style="font-size: 0.8rem; padding: 0.5rem 0.9rem; border-color: #ff6b6b; color: #ff6b6b;">
+            <button class="btn btn-outline-danger" id="btn-open-wipe-modal" style="font-size: 0.8rem; padding: 0.5rem 0.9rem; border-color: #ff6b6b; color: #ff6b6b;">
               🗑️ Wipe All Data ("DELETE" Confirmation)
             </button>
             <button class="btn btn-secondary" id="btn-wa-send-test" style="font-size: 0.8rem; padding: 0.5rem 0.9rem;">
@@ -295,6 +295,33 @@ export function renderWhatsAppManager(container, state) {
       </div>
 
     </div>
+
+    <!-- Custom High-Contrast Dark Confirmation Modal Overlay for Data Wipe -->
+    <div id="wipe-confirm-modal-overlay" class="modal-backdrop" style="display: none; align-items: center; justify-content: center; z-index: 10000;">
+      <div style="background: var(--bg-card); border: 2px solid #ff6b6b; border-radius: var(--radius-md); width: 90%; max-width: 520px; padding: 2rem; box-shadow: 0 25px 70px rgba(255,107,107,0.3); text-align: center; position: relative;">
+        <button id="btn-close-wipe-modal" style="position: absolute; top: 1rem; right: 1rem; background: transparent; border: none; color: var(--text-muted); font-size: 1.4rem; cursor: pointer;">✕</button>
+        
+        <div style="font-size: 3rem; margin-bottom: 0.5rem;">⚠️</div>
+        <h3 style="color: #ff6b6b; font-size: 1.3rem; margin-bottom: 0.6rem;">Confirm Permanent Data Wipe</h3>
+        <p style="font-size: 0.88rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 1.5rem;">
+          You are about to permanently delete <strong>ALL ${logs.length + followUps.length} records</strong> from your WhatsApp dispatch history and scheduled follow-up queue.
+        </p>
+
+        <div style="background: var(--bg-secondary); padding: 1.2rem; border-radius: var(--radius-sm); border: 1px solid var(--border-light); margin-bottom: 1.5rem; text-align: left;">
+          <label style="display: block; font-size: 0.8rem; color: var(--accent-gold); font-weight: 700; margin-bottom: 0.5rem;">
+            Type <span style="color: #ffffff; background: rgba(255,107,107,0.2); padding: 0.15rem 0.4rem; border-radius: 4px; border: 1px solid #ff6b6b;">DELETE</span> below to unlock confirmation:
+          </label>
+          <input type="text" id="wipe-strict-input" class="form-input" placeholder="Type DELETE here..." style="font-weight: 800; font-size: 1.1rem; color: #ff6b6b; border-color: rgba(255,107,107,0.5); letter-spacing: 0.1em; text-align: center;" />
+        </div>
+
+        <div style="display: flex; gap: 1rem; justify-content: flex-end;">
+          <button class="btn btn-secondary" id="btn-cancel-wipe" style="flex: 1;">Cancel</button>
+          <button class="btn" id="btn-confirm-wipe-final" disabled style="flex: 1; background: #333333; color: #777777; border: 1px solid #555; cursor: not-allowed; font-weight: 700; transition: all 0.2s ease;">
+            🗑️ Confirm Wipe All
+          </button>
+        </div>
+      </div>
+    </div>
   `;
 
   // Attach Tag Chip Insertion Handlers
@@ -317,7 +344,7 @@ export function renderWhatsAppManager(container, state) {
     });
   });
 
-  // Attach Event Listeners
+  // Attach Device Connection Handlers
   container.querySelector('#btn-wa-toggle-conn')?.addEventListener('click', () => {
     appStore.toggleWhatsAppConnection();
     renderWhatsAppManager(container, appStore.state);
@@ -352,15 +379,48 @@ export function renderWhatsAppManager(container, state) {
     renderWhatsAppManager(container, appStore.state);
   });
 
-  // Strict "DELETE" Confirmation Modal for Wiping All Data
-  container.querySelector('#btn-wa-wipe-all')?.addEventListener('click', () => {
-    const userInput = prompt("⚠️ WARNING: You are about to permanently delete ALL WhatsApp history logs & scheduled follow-up queue data.\n\nTo confirm, type DELETE below:");
-    if (userInput === 'DELETE') {
-      const wipedCount = appStore.wipeAllWhatsAppLogs();
-      appStore.showToast(`Successfully wiped all ${wipedCount} history logs and queue items!`, 'success');
+  // Custom Dark Confirmation Modal Overlay for Data Wipe
+  const wipeModal = container.querySelector('#wipe-confirm-modal-overlay');
+  const wipeInput = container.querySelector('#wipe-strict-input');
+  const wipeBtn = container.querySelector('#btn-confirm-wipe-final');
+
+  container.querySelector('#btn-open-wipe-modal')?.addEventListener('click', () => {
+    wipeModal.style.display = 'flex';
+    wipeInput.value = '';
+    wipeBtn.disabled = true;
+    wipeBtn.style.background = '#333333';
+    wipeBtn.style.color = '#777777';
+    wipeBtn.style.cursor = 'not-allowed';
+    setTimeout(() => wipeInput.focus(), 50);
+  });
+
+  function closeWipeModal() {
+    wipeModal.style.display = 'none';
+  }
+
+  container.querySelector('#btn-close-wipe-modal')?.addEventListener('click', closeWipeModal);
+  container.querySelector('#btn-cancel-wipe')?.addEventListener('click', closeWipeModal);
+
+  wipeInput?.addEventListener('input', (e) => {
+    if (e.target.value.trim() === 'DELETE') {
+      wipeBtn.disabled = false;
+      wipeBtn.style.background = '#e74c3c';
+      wipeBtn.style.color = '#ffffff';
+      wipeBtn.style.cursor = 'pointer';
+    } else {
+      wipeBtn.disabled = true;
+      wipeBtn.style.background = '#333333';
+      wipeBtn.style.color = '#777777';
+      wipeBtn.style.cursor = 'not-allowed';
+    }
+  });
+
+  wipeBtn?.addEventListener('click', () => {
+    if (wipeInput.value.trim() === 'DELETE') {
+      const count = appStore.wipeAllWhatsAppLogs();
+      closeWipeModal();
+      appStore.showToast(`Successfully wiped all ${count} records!`, 'success');
       renderWhatsAppManager(container, appStore.state);
-    } else if (userInput !== null) {
-      appStore.showToast('Wipe cancelled. You must type "DELETE" exactly to confirm.', 'warning');
     }
   });
 
