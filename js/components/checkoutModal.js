@@ -2,7 +2,7 @@
  * Multi-Step Pakistani Checkout Modal Component
  * Step 1: Customer Info & City
  * Step 2: Courier Logistics Selection (TCS, Trax, Leopards)
- * Step 3: Pakistani Payment Method (COD, JazzCash, EasyPaisa, SadaPay/NayaPay, Bank Transfer) + Account Details + Proof Screenshot Upload + 2hr Notice
+ * Step 3: Pakistani Payment Method (COD, JazzCash, EasyPaisa, SadaPay/NayaPay, Bank Transfer) + Account Details + Mandatory Proof Screenshot Upload + 2hr Notice
  * Step 4: Receipt & Consignment Tracking Generator
  */
 
@@ -18,6 +18,7 @@ export function renderCheckoutModal(container, state) {
   if (!isOpen) {
     container.classList.remove('active');
     container.innerHTML = '';
+    paymentProofBase64 = null;
     return;
   }
 
@@ -140,7 +141,7 @@ export function renderCheckoutModal(container, state) {
             <!-- Upload Screenshot Box -->
             <div style="margin-top: 1.2rem; border-top: 1px dashed var(--border-gold); padding-top: 1rem;">
               <label class="form-label" style="color: var(--accent-gold); font-weight: 700; font-size: 0.95rem;">
-                📸 Upload Payment Proof Screenshot:
+                📸 Attach Payment Proof Screenshot * (Mandatory for digital payments)
               </label>
               <input type="file" id="payment-proof-file-input" accept="image/*" class="form-input" style="padding: 0.6rem; background: var(--bg-secondary); cursor: pointer;" />
               
@@ -263,11 +264,19 @@ export function renderCheckoutModal(container, state) {
     appStore.toggleCheckout(false);
   });
 
-  // Submit Order Form
+  // Submit Order Form with Mandatory Payment Proof Validation
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const formData = new FormData(form);
     const selectedPay = formData.get('paymentMethod');
+
+    // Strict Validation: If digital payment selected, paymentProofBase64 MUST NOT be null!
+    if (selectedPay !== 'Cash on Delivery' && !paymentProofBase64) {
+      alert(`⚠️ PAYMENT PROOF SCREENSHOT REQUIRED!\n\nYou selected ${selectedPay}. Please attach a screenshot of your payment transfer before proceeding with your order.`);
+      proofInput?.focus();
+      proofInput?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
 
     const orderDetails = {
       customerName: formData.get('customerName'),
