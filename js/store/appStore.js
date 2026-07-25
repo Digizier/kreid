@@ -89,10 +89,10 @@ class AppStore {
         qrImageDataUrl: null
       }),
       whatsappTemplates: this.loadStorage('kreid_wa_templates', {
-        order_placed: "Assalam-o-Alaikum [Customer Name]! Thank you for your order #[Order ID] at KREID COUTURE. Total: PKR [Total PKR]. Courier: [Courier]. Tracking #: [Tracking Number]. Our team will verify and dispatch your order shortly!",
-        status_shipped: "Hi [Customer Name]! Great news! Your KREID order #[Order ID] has been SHIPPED via [Courier]. Tracking #: [Tracking Number]. Track live at KREID portal!",
-        status_delivered: "Assalam-o-Alaikum [Customer Name]! Your KREID order #[Order ID] has been DELIVERED. Thank you for choosing KREID COUTURE! We hope you love your outfit.",
-        status_cancelled: "Assalam-o-Alaikum [Customer Name]! Your KREID order #[Order ID] has been CANCELLED. If you have any questions or would like to re-order, please contact our support team at +92 300 1234567."
+        order_placed: "Assalam-o-Alaikum [Customer Name]! Thank you for your order #[Order ID] at [Store Name]. Total: PKR [Total PKR]. Courier: [Courier]. Tracking #: [Tracking Number]. Our team will verify and dispatch your order shortly!",
+        status_shipped: "Hi [Customer Name]! Great news! Your [Store Name] order #[Order ID] has been SHIPPED via [Courier]. Tracking #: [Tracking Number]. Status: [Order Status]. Track live at KREID portal!",
+        status_delivered: "Assalam-o-Alaikum [Customer Name]! Your [Store Name] order #[Order ID] has been DELIVERED. Thank you for choosing [Store Name]! We hope you love your outfit.",
+        status_cancelled: "Assalam-o-Alaikum [Customer Name]! Your [Store Name] order #[Order ID] has been CANCELLED. If you have any questions or would like to re-order, please contact our support team at +92 300 1234567."
       }),
       whatsappFollowUps: this.loadStorage('kreid_wa_followups', [
         {
@@ -216,7 +216,7 @@ class AppStore {
 
   // Auto Purge Data Retention Engine for WhatsApp Logs & Follow-Ups
   purgeOldWhatsAppLogs(manualDays = null) {
-    const days = manualDays || this.state.whatsappConfig.retentionDays || 30;
+    const days = manualDays !== null ? manualDays : (this.state.whatsappConfig.retentionDays || 30);
     if (days === 0) return 0; // 0 means Never auto-delete
 
     const cutoffTimestamp = Date.now() - (days * 86400000);
@@ -242,6 +242,18 @@ class AppStore {
       console.log(`🧹 Auto-purged ${purgedCount} old WhatsApp log records (> ${days} days old)`);
     }
     return purgedCount;
+  }
+
+  // Complete Wipe All Data (with confirmation prompt)
+  wipeAllWhatsAppLogs() {
+    const count = this.state.whatsappLogs.length + this.state.whatsappFollowUps.length;
+    this.state.whatsappLogs = [];
+    this.state.whatsappFollowUps = [];
+    this.saveStorage('kreid_wa_logs', []);
+    this.saveStorage('kreid_wa_followups', []);
+    this.showToast(`Cleared all ${count} WhatsApp logs and follow-up queue records!`, 'info');
+    this.notify();
+    return count;
   }
 
   // Helper to extract server base origin URL from API endpoint
@@ -354,13 +366,15 @@ class AppStore {
     const templates = this.state.whatsappTemplates;
     let templateText = templates[eventType] || templates.order_placed || "Hello from KREID COUTURE!";
 
-    // Replace tags
+    // Evaluate and replace all dynamic tags
     templateText = templateText
       .replace(/\[Customer Name\]/g, orderData.customerName || 'Valued Customer')
       .replace(/\[Order ID\]/g, orderData.id || 'N/A')
       .replace(/\[Total PKR\]/g, orderData.total ? orderData.total.toLocaleString() : '0')
       .replace(/\[Courier\]/g, orderData.courier || 'Trax Logistics')
-      .replace(/\[Tracking Number\]/g, orderData.trackingNo || 'TRX-101');
+      .replace(/\[Tracking Number\]/g, orderData.trackingNo || 'TRX-101')
+      .replace(/\[Order Status\]/g, orderData.status || 'Processing')
+      .replace(/\[Store Name\]/g, 'KREID COUTURE');
 
     const endpoint = this.state.whatsappConfig.primaryEndpoint || 'https://localhost-kreid-whatsapp-auto-message.1k6q7u.easypanel.host/api/whatsapp/send';
 

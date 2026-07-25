@@ -1,6 +1,6 @@
 /**
  * KREID WhatsApp Automation Suite Component
- * Direct Live Easypanel PNG QR Code Image Streaming, Cancellation Templates & Configurable Auto-Purge Retention Engine.
+ * Direct Live Easypanel PNG QR Code Image Streaming, Clickable Dynamic Tag Inserter & Custom Days Auto-Purge with "DELETE" Confirmation Modal.
  */
 
 import { appStore } from '../store/appStore.js';
@@ -14,6 +14,16 @@ export function renderWhatsAppManager(container, state) {
 
   const serverBaseUrl = appStore.getServerBaseUrl();
   const directQrImageUrl = `${serverBaseUrl}/api/qr.png?t=${Date.now()}`;
+
+  const availableTags = [
+    { tag: '[Customer Name]', desc: 'Customer Full Name (e.g. Zain Ali)' },
+    { tag: '[Order ID]', desc: 'Order Reference (e.g. ORD-98231)' },
+    { tag: '[Total PKR]', desc: 'Order Total Amount (e.g. 3,700)' },
+    { tag: '[Courier]', desc: 'Logistics Partner (e.g. Trax Logistics)' },
+    { tag: '[Tracking Number]', desc: 'Shipment Tracking Code (e.g. TRX-8827419)' },
+    { tag: '[Order Status]', desc: 'Current Status (Processing, Shipped, Delivered, Cancelled)' },
+    { tag: '[Store Name]', desc: 'Brand Name (KREID COUTURE)' }
+  ];
 
   container.innerHTML = `
     <div style="display: flex; flex-direction: column; gap: 2rem; max-width: 1100px;">
@@ -76,16 +86,19 @@ export function renderWhatsAppManager(container, state) {
         </div>
       </div>
 
-      <!-- Section 2: Primary WhatsApp Gateway & Data Retention Control -->
+      <!-- Section 2: Primary WhatsApp Gateway & Data Retention Control (With Custom Days & Wipe Button) -->
       <div style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 1.8rem; border-radius: var(--radius-md);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.2rem; flex-wrap: wrap; gap: 1rem;">
           <div>
-            <h3 style="font-size: 1.2rem; color: var(--accent-gold);">⚡ Primary Gateway & Data Retention Settings</h3>
-            <p style="font-size: 0.82rem; color: var(--text-muted);">Configure live Easypanel endpoint and automatic log/queue data deletion rules.</p>
+            <h3 style="font-size: 1.2rem; color: var(--accent-gold);">⚡ Primary Gateway & Data Retention Controls</h3>
+            <p style="font-size: 0.82rem; color: var(--text-muted);">Set custom days auto-purge thresholds or wipe all historical logs permanently.</p>
           </div>
-          <div style="display: flex; gap: 0.6rem;">
+          <div style="display: flex; gap: 0.6rem; flex-wrap: wrap;">
             <button class="btn btn-secondary" id="btn-wa-purge-now" style="font-size: 0.8rem; padding: 0.5rem 0.9rem;">
-              🧹 Purge Old Records Now
+              🧹 Purge Old Records (${waConfig.retentionDays || 30} Days)
+            </button>
+            <button class="btn btn-outline-danger" id="btn-wa-wipe-all" style="font-size: 0.8rem; padding: 0.5rem 0.9rem; border-color: #ff6b6b; color: #ff6b6b;">
+              🗑️ Wipe All Data ("DELETE" Confirmation)
             </button>
             <button class="btn btn-secondary" id="btn-wa-send-test" style="font-size: 0.8rem; padding: 0.5rem 0.9rem;">
               ✉️ Send Test Message
@@ -105,15 +118,11 @@ export function renderWhatsAppManager(container, state) {
                 <input type="text" name="linkedNumber" class="form-input" value="${waSession.linkedNumber || '+92 300 1234567'}" />
               </div>
               <div class="form-group">
-                <label class="form-label">Auto-Delete History & Queue Data</label>
-                <select name="retentionDays" class="form-select">
-                  <option value="7" ${waConfig.retentionDays == 7 ? 'selected' : ''}>Auto-Delete older than 7 Days</option>
-                  <option value="14" ${waConfig.retentionDays == 14 ? 'selected' : ''}>Auto-Delete older than 14 Days</option>
-                  <option value="30" ${waConfig.retentionDays == 30 || !waConfig.retentionDays ? 'selected' : ''}>Auto-Delete older than 30 Days (Recommended)</option>
-                  <option value="60" ${waConfig.retentionDays == 60 ? 'selected' : ''}>Auto-Delete older than 60 Days</option>
-                  <option value="90" ${waConfig.retentionDays == 90 ? 'selected' : ''}>Auto-Delete older than 90 Days</option>
-                  <option value="0" ${waConfig.retentionDays == 0 ? 'selected' : ''}>Keep Forever (Never Delete)</option>
-                </select>
+                <label class="form-label">Auto-Delete Threshold (Custom Days)</label>
+                <div style="display: flex; gap: 0.5rem;">
+                  <input type="number" name="customRetentionDays" min="0" max="365" class="form-input" value="${waConfig.retentionDays !== undefined ? waConfig.retentionDays : 30}" placeholder="Enter days (e.g. 15)" style="font-weight: 700; color: var(--accent-gold);" />
+                  <span style="display: flex; align-items: center; font-size: 0.8rem; color: var(--text-muted); white-space: nowrap;">Days (0 = Never)</span>
+                </div>
               </div>
             </div>
 
@@ -124,48 +133,65 @@ export function renderWhatsAppManager(container, state) {
           </div>
 
           <button type="submit" class="btn btn-primary">
-            💾 Save Primary WhatsApp Gateway & Retention Settings
+            💾 Save Gateway & Custom Retention Days Settings
           </button>
         </form>
       </div>
 
-      <!-- Section 3: Event Notification Templates (Including Cancelled Template) -->
+      <!-- Section 3: Interactive Dynamic Tags Cheat Sheet & Event Templates -->
       <div style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 1.8rem; border-radius: var(--radius-md);">
-        <h3 style="font-size: 1.2rem; color: var(--accent-gold); margin-bottom: 0.5rem;">📝 Automated Order Event WhatsApp Templates</h3>
+        <h3 style="font-size: 1.2rem; color: var(--accent-gold); margin-bottom: 0.4rem;">📝 Automated Order Event WhatsApp Templates & Dynamic Tags</h3>
         <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 1.2rem;">
-          Supported dynamic tags: <code>[Customer Name]</code>, <code>[Order ID]</code>, <code>[Total PKR]</code>, <code>[Courier]</code>, <code>[Tracking Number]</code>
+          Click any dynamic tag button below to insert it directly into your template message!
         </p>
 
+        <!-- Dynamic Tags Guide & Clickable Tag Chips -->
+        <div style="background: var(--bg-secondary); border: 1px solid var(--border-gold); padding: 1.2rem; border-radius: var(--radius-sm); margin-bottom: 1.5rem;">
+          <div style="font-size: 0.85rem; font-weight: 700; color: var(--accent-gold); margin-bottom: 0.6rem;">🏷️ AVAILABLE DYNAMIC TAGS (Click to Copy / Insert):</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.8rem;">
+            ${availableTags.map(t => `
+              <button type="button" class="btn-tag-chip" data-tag="${t.tag}" style="background: rgba(212, 175, 55, 0.15); border: 1.5px solid var(--accent-gold); color: var(--accent-gold); font-family: monospace; font-weight: 700; font-size: 0.8rem; padding: 0.35rem 0.7rem; border-radius: 4px; cursor: pointer; transition: all 0.2s ease;">
+                + ${t.tag}
+              </button>
+            `).join('')}
+          </div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0.5rem; font-size: 0.78rem; color: var(--text-muted);">
+            ${availableTags.map(t => `
+              <div><code style="color: #fff; font-weight: 700;">${t.tag}</code> → ${t.desc}</div>
+            `).join('')}
+          </div>
+        </div>
+
         <form id="wa-templates-form">
-          <div style="display: flex; flex-direction: column; gap: 1.2rem;">
+          <div style="display: flex; flex-direction: column; gap: 1.4rem;">
             <div class="form-group">
               <label class="form-label">1. Order Placed Template (Sent upon checkout)</label>
-              <textarea name="tplOrderPlaced" class="form-input" rows="2">${templates.order_placed}</textarea>
+              <textarea id="tpl-order-placed" name="tplOrderPlaced" class="form-input wa-template-textarea" rows="3">${templates.order_placed}</textarea>
             </div>
 
             <div class="form-group">
               <label class="form-label">2. Status: Shipped Template (Sent upon courier dispatch)</label>
-              <textarea name="tplShipped" class="form-input" rows="2">${templates.status_shipped}</textarea>
+              <textarea id="tpl-shipped" name="tplShipped" class="form-input wa-template-textarea" rows="3">${templates.status_shipped}</textarea>
             </div>
 
             <div class="form-group">
               <label class="form-label">3. Status: Delivered Template (Sent upon delivery completion)</label>
-              <textarea name="tplDelivered" class="form-input" rows="2">${templates.status_delivered}</textarea>
+              <textarea id="tpl-delivered" name="tplDelivered" class="form-input wa-template-textarea" rows="3">${templates.status_delivered}</textarea>
             </div>
 
             <div class="form-group">
               <label class="form-label" style="color: #ff6b6b;">4. Status: Cancelled Template (Sent upon order cancellation)</label>
-              <textarea name="tplCancelled" class="form-input" rows="2" style="border-color: rgba(255, 107, 107, 0.4);">${templates.status_cancelled || 'Assalam-o-Alaikum [Customer Name]! Your KREID order #[Order ID] has been CANCELLED. If you have any questions or would like to re-order, please contact our support team at +92 300 1234567.'}</textarea>
+              <textarea id="tpl-cancelled" name="tplCancelled" class="form-input wa-template-textarea" rows="3" style="border-color: rgba(255, 107, 107, 0.4);">${templates.status_cancelled || 'Assalam-o-Alaikum [Customer Name]! Your [Store Name] order #[Order ID] has been CANCELLED. If you have any questions or would like to re-order, please contact our support team at +92 300 1234567.'}</textarea>
             </div>
           </div>
 
-          <button type="submit" class="btn btn-primary" style="margin-top: 1rem;">
+          <button type="submit" class="btn btn-primary" style="margin-top: 1.2rem;">
             💾 Save Message Templates
           </button>
         </form>
       </div>
 
-      <!-- Section 4: Scheduled Automated Follow-Up Message Automation -->
+      <!-- Section 4: Scheduled Customer Follow-Up Message Automation -->
       <div style="background: var(--bg-card); border: 1px solid var(--border-light); padding: 1.8rem; border-radius: var(--radius-md);">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
           <h3 style="font-size: 1.2rem; color: var(--accent-gold);">⏰ Scheduled Customer Follow-Up Message Automation</h3>
@@ -271,6 +297,26 @@ export function renderWhatsAppManager(container, state) {
     </div>
   `;
 
+  // Attach Tag Chip Insertion Handlers
+  let lastFocusedTextarea = container.querySelector('#tpl-order-placed');
+  container.querySelectorAll('.wa-template-textarea').forEach(ta => {
+    ta.addEventListener('focus', () => { lastFocusedTextarea = ta; });
+  });
+
+  container.querySelectorAll('.btn-tag-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tagStr = btn.getAttribute('data-tag');
+      if (lastFocusedTextarea) {
+        const start = lastFocusedTextarea.selectionStart || lastFocusedTextarea.value.length;
+        const end = lastFocusedTextarea.selectionEnd || lastFocusedTextarea.value.length;
+        const text = lastFocusedTextarea.value;
+        lastFocusedTextarea.value = text.slice(0, start) + ' ' + tagStr + ' ' + text.slice(end);
+        lastFocusedTextarea.focus();
+        appStore.showToast(`Inserted "${tagStr}" into template!`, 'info');
+      }
+    });
+  });
+
   // Attach Event Listeners
   container.querySelector('#btn-wa-toggle-conn')?.addEventListener('click', () => {
     appStore.toggleWhatsAppConnection();
@@ -299,10 +345,23 @@ export function renderWhatsAppManager(container, state) {
     appStore.showToast('Pairing Code copied to clipboard!', 'info');
   });
 
+  // Purge Old Records Manual Trigger
   container.querySelector('#btn-wa-purge-now')?.addEventListener('click', () => {
     const count = appStore.purgeOldWhatsAppLogs();
-    appStore.showToast(`Purged ${count} records older than configured retention period!`, 'info');
+    appStore.showToast(`Purged ${count} records older than ${waConfig.retentionDays || 30} days!`, 'info');
     renderWhatsAppManager(container, appStore.state);
+  });
+
+  // Strict "DELETE" Confirmation Modal for Wiping All Data
+  container.querySelector('#btn-wa-wipe-all')?.addEventListener('click', () => {
+    const userInput = prompt("⚠️ WARNING: You are about to permanently delete ALL WhatsApp history logs & scheduled follow-up queue data.\n\nTo confirm, type DELETE below:");
+    if (userInput === 'DELETE') {
+      const wipedCount = appStore.wipeAllWhatsAppLogs();
+      appStore.showToast(`Successfully wiped all ${wipedCount} history logs and queue items!`, 'success');
+      renderWhatsAppManager(container, appStore.state);
+    } else if (userInput !== null) {
+      appStore.showToast('Wipe cancelled. You must type "DELETE" exactly to confirm.', 'warning');
+    }
   });
 
   container.querySelector('#btn-wa-send-test')?.addEventListener('click', () => {
@@ -314,7 +373,8 @@ export function renderWhatsAppManager(container, state) {
         id: "TEST-101",
         total: 5000,
         courier: "Trax Logistics",
-        trackingNo: "TRX-998241"
+        trackingNo: "TRX-998241",
+        status: "Processing"
       });
       renderWhatsAppManager(container, appStore.state);
     }
@@ -331,10 +391,12 @@ export function renderWhatsAppManager(container, state) {
       appStore.saveStorage('kreid_wa_session', state.whatsappSession);
     }
 
+    const customDays = parseInt(fd.get('customRetentionDays')) || 0;
+
     appStore.updateWhatsAppConfig({
       primaryProvider: fd.get('primaryProvider'),
       primaryEndpoint: fd.get('primaryEndpoint'),
-      retentionDays: parseInt(fd.get('retentionDays'))
+      retentionDays: customDays
     });
     renderWhatsAppManager(container, appStore.state);
   });
@@ -349,6 +411,6 @@ export function renderWhatsAppManager(container, state) {
     state.whatsappTemplates.status_delivered = fd.get('tplDelivered');
     state.whatsappTemplates.status_cancelled = fd.get('tplCancelled');
     appStore.saveStorage('kreid_wa_templates', state.whatsappTemplates);
-    appStore.showToast('WhatsApp templates (including Order Cancellation) updated!', 'success');
+    appStore.showToast('WhatsApp templates updated with custom dynamic tags!', 'success');
   });
 }
