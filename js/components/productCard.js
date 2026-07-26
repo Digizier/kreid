@@ -36,13 +36,14 @@ export function createProductCard(product) {
       <!-- Mobile-Optimized Action Tray -->
       <div class="card-actions">
         <button class="btn btn-secondary btn-quick-view" title="Quick View Details">
-          👁️ <span class="btn-text-desktop">Details</span>
+          <span>👁️</span><span class="btn-text-desktop"> View</span>
         </button>
         <button class="btn btn-primary btn-add-cart" title="Add to Cart">
-          🛒 <span class="btn-text-full">+ Add to Cart</span>
+          <span>🛒</span> <span class="btn-text-full">+ Add</span>
         </button>
       </div>
     </div>
+
   `;
 
   // Attach Event Listeners

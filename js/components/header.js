@@ -34,13 +34,19 @@ export function renderHeader(container, state) {
         </div>
 
         <!-- Navigation Links (Collapsible Drawer on Mobile) -->
+        <div id="mobile-nav-backdrop" class="mobile-nav-backdrop"></div>
         <nav class="main-nav" id="storefront-main-nav">
-          <a href="#" class="nav-link ${state.activeCategory === 'all' && !state.searchQuery ? 'active' : ''}" data-category="all">All Items</a>
-          <a href="#" class="nav-link ${state.activeCategory === 'shoes' ? 'active' : ''}" data-category="shoes">Shoes</a>
-          <a href="#" class="nav-link ${state.activeCategory === 'tshirts' ? 'active' : ''}" data-category="tshirts">T-Shirts</a>
-          <a href="#" class="nav-link ${state.activeCategory === 'trousers' ? 'active' : ''}" data-category="trousers">Trousers</a>
-          <a href="#" class="nav-link ${state.activeCategory === 'pants' ? 'active' : ''}" data-category="pants">Pants</a>
+          <div class="mobile-nav-header" style="justify-content: space-between; align-items: center; width: 100%; margin-bottom: 0.5rem; border-bottom: 1px solid var(--border-gold); padding-bottom: 0.8rem;">
+            <div style="font-family: var(--font-heading); font-weight: 800; color: var(--accent-gold); font-size: 1.15rem; letter-spacing: 0.15em;">KREID MENU</div>
+            <button id="btn-close-mobile-nav" style="background: var(--bg-primary); border: 1px solid var(--border-light); color: #fff; width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center;">✕</button>
+          </div>
+          <a href="#" class="nav-link ${state.activeCategory === 'all' && !state.searchQuery ? 'active' : ''}" data-category="all">All Items <span class="mobile-arrow">→</span></a>
+          <a href="#" class="nav-link ${state.activeCategory === 'shoes' ? 'active' : ''}" data-category="shoes">Shoes <span class="mobile-arrow">→</span></a>
+          <a href="#" class="nav-link ${state.activeCategory === 'tshirts' ? 'active' : ''}" data-category="tshirts">T-Shirts <span class="mobile-arrow">→</span></a>
+          <a href="#" class="nav-link ${state.activeCategory === 'trousers' ? 'active' : ''}" data-category="trousers">Trousers <span class="mobile-arrow">→</span></a>
+          <a href="#" class="nav-link ${state.activeCategory === 'pants' ? 'active' : ''}" data-category="pants">Pants <span class="mobile-arrow">→</span></a>
         </nav>
+
 
         <!-- Right Action Tray -->
         <div class="header-actions">
@@ -119,14 +125,35 @@ export function renderHeader(container, state) {
   // Attach Navigation & Mobile Drawer Toggle Handlers
   const mobileToggle = container.querySelector('#btn-mobile-menu-toggle');
   const mainNav = container.querySelector('#storefront-main-nav');
+  const backdrop = container.querySelector('#mobile-nav-backdrop');
+  const closeNavBtn = container.querySelector('#btn-close-mobile-nav');
+
+  function openMobileNav() {
+    mainNav?.classList.add('mobile-active');
+    backdrop?.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeMobileNav() {
+    mainNav?.classList.remove('mobile-active');
+    backdrop?.classList.remove('active');
+    document.body.style.overflow = '';
+  }
 
   mobileToggle?.addEventListener('click', () => {
-    mainNav?.classList.toggle('mobile-active');
+    if (mainNav?.classList.contains('mobile-active')) {
+      closeMobileNav();
+    } else {
+      openMobileNav();
+    }
   });
+
+  closeNavBtn?.addEventListener('click', closeMobileNav);
+  backdrop?.addEventListener('click', closeMobileNav);
 
   container.querySelector('#logo-home')?.addEventListener('click', (e) => {
     e.preventDefault();
-    mainNav?.classList.remove('mobile-active');
+    closeMobileNav();
     appStore.setCategory('all');
     appStore.setSearchQuery('');
   });
@@ -134,7 +161,7 @@ export function renderHeader(container, state) {
   container.querySelectorAll('.nav-link').forEach(link => {
     link.addEventListener('click', (e) => {
       e.preventDefault();
-      mainNav?.classList.remove('mobile-active');
+      closeMobileNav();
       appStore.setCategory(link.dataset.category);
       appStore.setSearchQuery('');
     });

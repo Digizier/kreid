@@ -98,7 +98,7 @@ export function renderProductModal(container, product) {
         </div>
 
         <!-- Action Buttons -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+        <div class="product-modal-actions">
           <button class="btn btn-primary" id="btn-modal-add-cart">
             🛒 Add to Cart
           </button>
@@ -108,6 +108,7 @@ export function renderProductModal(container, product) {
         </div>
       </div>
     </div>
+
   `;
 
   // Attach Gallery Thumbnail Click
