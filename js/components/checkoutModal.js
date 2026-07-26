@@ -9,9 +9,6 @@ import { emailService } from '../services/emailService.js';
 
 let paymentProofBase64 = null;
 
-
-let confirmedOrderData = null;
-
 export function renderCheckoutModal(container, state) {
   const isOpen = state.isCheckoutOpen;
   const cartTotal = appStore.getCartTotal();
@@ -21,15 +18,15 @@ export function renderCheckoutModal(container, state) {
     container.classList.remove('active');
     container.innerHTML = '';
     paymentProofBase64 = null;
-    confirmedOrderData = null;
+    appStore.state.confirmedOrder = null;
     return;
   }
 
   container.classList.add('active');
 
   // If order is confirmed, render Local Order Confirmation Receipt UI!
-  if (confirmedOrderData) {
-    renderLocalOrderConfirmationUI(container, confirmedOrderData);
+  if (state.confirmedOrder) {
+    renderLocalOrderConfirmationUI(container, state, state.confirmedOrder);
     return;
   }
 
@@ -224,6 +221,11 @@ export function renderCheckoutModal(container, state) {
 
     if (selectedVal === 'Cash on Delivery') {
       detailsBox.style.display = 'none';
+      paymentProofBase64 = null;
+      const proofPreview = container.querySelector('#proof-img-preview');
+      const proofInput = container.querySelector('#payment-proof-file-input');
+      if (proofPreview) proofPreview.style.display = 'none';
+      if (proofInput) proofInput.value = '';
     } else {
       detailsBox.style.display = 'block';
       if (selectedVal === 'JazzCash') {
@@ -355,11 +357,24 @@ export function renderCheckoutModal(container, state) {
       paymentProof: paymentProofBase64 || null
     };
 
-    confirmedOrderData = appStore.createOrder(orderDetails);
+    try {
+      appStore.createOrder(orderDetails);
+    } catch (err) {
+      console.error("Order creation failed:", err);
+      errorMsg.innerHTML = `System Error: Failed to process order. Please try again. (${err.message})`;
+      errorBanner.style.display = 'block';
+      errorBanner.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
     paymentProofBase64 = null;
 
-    if (confirmedOrderData && confirmedOrderData.email) {
-      emailService.sendOrderReceiptEmail(confirmedOrderData);
+    if (appStore.state.confirmedOrder && appStore.state.confirmedOrder.email) {
+      try {
+        emailService.sendOrderReceiptEmail(appStore.state.confirmedOrder);
+      } catch (err) {
+        console.warn("Background email dispatch failed:", err.message);
+      }
     }
 
     renderCheckoutModal(container, appStore.state);
@@ -371,7 +386,7 @@ export function renderCheckoutModal(container, state) {
  * Local Order Confirmation Receipt UI Component
  * Replaces old browser alerts with a stunning dark luxury order receipt modal.
  */
-function renderLocalOrderConfirmationUI(container, order) {
+function renderLocalOrderConfirmationUI(container, state, order) {
   const isDigital = order.paymentMethod !== 'Cash on Delivery';
 
   container.innerHTML = `
@@ -456,18 +471,18 @@ function renderLocalOrderConfirmationUI(container, order) {
   `;
 
   container.querySelector('#btn-close-confirmation')?.addEventListener('click', () => {
-    confirmedOrderData = null;
+    appStore.clearConfirmedOrder();
     appStore.toggleCheckout(false);
   });
 
   container.querySelector('#btn-continue-shopping')?.addEventListener('click', () => {
-    confirmedOrderData = null;
+    appStore.clearConfirmedOrder();
     appStore.toggleCheckout(false);
   });
 
   container.querySelector('#btn-track-confirmed-order')?.addEventListener('click', () => {
-    const targetOrder = confirmedOrderData;
-    confirmedOrderData = null;
+    const targetOrder = order;
+    appStore.clearConfirmedOrder();
     appStore.toggleCheckout(false);
     appStore.state.trackedOrder = targetOrder;
     appStore.toggleOrderTracker(true);

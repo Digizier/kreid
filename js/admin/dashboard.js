@@ -6,6 +6,7 @@
 import { appStore } from '../store/appStore.js';
 import { renderWhatsAppManager } from './whatsappManager.js';
 import { renderEmailManager } from './emailManager.js';
+import { renderSupabaseManager } from './supabaseManager.js';
 import { emailService } from '../services/emailService.js';
 import { majorMetroCities, allPakistanCities } from '../data/pakistanCities.js';
 
@@ -61,6 +62,9 @@ export function renderAdminDashboard(container, state) {
           <div class="menu-item ${activeTab === 'coupons' ? 'active' : ''}" data-tab="coupons">
             🎟️ Discount Coupons (${state.coupons.length})
           </div>
+          <div class="menu-item ${activeTab === 'supabase' ? 'active' : ''}" data-tab="supabase">
+            🔗 Database (Supabase)
+          </div>
           <div class="menu-item ${activeTab === 'settings' ? 'active' : ''}" data-tab="settings">
             ⚙️ Payment Accounts Settings
           </div>
@@ -88,7 +92,9 @@ export function renderAdminDashboard(container, state) {
                 activeTab === 'cityrates' ? '127+ Pakistani Cities Custom Shipping Rates' :
                 activeTab === 'whatsapp' ? 'WhatsApp Automation & Dual-Gateway Suite' :
                 activeTab === 'email' ? 'Resend Email Automation & Dispatcher Suite' :
-                activeTab === 'coupons' ? 'Promotions & Coupons Engine' : 'Payment Accounts Settings'}
+                activeTab === 'coupons' ? 'Promotions & Coupons Engine' :
+                activeTab === 'supabase' ? 'Supabase Live Connection & Real-Time Sync' :
+                'Payment Accounts Settings'}
             </h1>
             <p style="color: var(--text-muted); font-size: 0.85rem;">
               Connected Live to KREID Storefront Data Engine
@@ -119,6 +125,8 @@ export function renderAdminDashboard(container, state) {
           ? '<div id="whatsapp-tab-container"></div>'
           : activeTab === 'email'
           ? '<div id="email-tab-container"></div>'
+          : activeTab === 'supabase'
+          ? '<div id="supabase-tab-container"></div>'
           : renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowStockCount)}
 
 
@@ -141,6 +149,11 @@ export function renderAdminDashboard(container, state) {
   if (activeTab === 'email') {
     const emailContainer = container.querySelector('#email-tab-container');
     if (emailContainer) renderEmailManager(emailContainer, state);
+  }
+
+  if (activeTab === 'supabase') {
+    const sbContainer = container.querySelector('#supabase-tab-container');
+    if (sbContainer) renderSupabaseManager(sbContainer, state);
   }
 
 
@@ -211,8 +224,10 @@ export function renderAdminDashboard(container, state) {
     }
   });
 
-  confirmWipeBtn?.addEventListener('click', () => {
-    appStore.wipeAllOrders();
+  confirmWipeBtn?.addEventListener('click', async () => {
+    confirmWipeBtn.disabled = true;
+    confirmWipeBtn.innerText = 'Wiping Supabase Data...';
+    await appStore.wipeAllOrders();
     if (wipeOrdersOverlay) wipeOrdersOverlay.style.display = 'none';
     renderAdminDashboard(container, appStore.state);
   });
@@ -272,6 +287,10 @@ export function renderAdminDashboard(container, state) {
       }
 
       appStore.saveAllCityShippingRates(ratesMap);
+    });
+
+    container.querySelector('#city-shipping-rates-form')?.addEventListener('submit', (e) => {
+      e.preventDefault();
     });
   }
 
@@ -420,7 +439,7 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
                 </td>
                 <td>
                   <strong style="color: #ffffff; font-size: 0.95rem;">${p.name}</strong>
-                  <div style="font-size: 0.75rem; color: var(--text-muted);">Model: ${p.model || 'N/A'} | Color: ${p.color || 'N/A'} | Sizes: ${p.sizes ? p.sizes.join(', ') : 'N/A'}</div>
+                  <div style="font-size: 0.75rem; color: var(--text-muted);">Model: ${p.model || 'N/A'} | Color: ${p.color || 'N/A'} | Sizes: ${p.sizes && Array.isArray(p.sizes) ? p.sizes.join(', ') : (p.sizes || 'N/A')}</div>
                 </td>
                 <td><span class="badge badge-gold">${p.category.toUpperCase()}</span></td>
                 <td>
@@ -525,7 +544,7 @@ function renderTabContent(state, totalRevenue, totalOrders, totalProducts, lowSt
 
           <input type="text" id="input-search-city-rates" placeholder="🔍 Filter City (e.g. Karachi, Lahore)..." style="padding: 0.6rem 1rem; width: 230px; background: var(--bg-primary); border: 1px solid var(--border-gold); color: #fff; border-radius: var(--radius-sm); font-size: 0.85rem;" />
           
-          <button id="btn-save-all-city-rates" class="btn btn-primary" style="padding: 0.6rem 1.2rem; font-size: 0.85rem; font-weight: 800; white-space: nowrap;">
+          <button id="btn-save-all-city-rates" type="button" class="btn btn-primary" style="padding: 0.6rem 1.2rem; font-size: 0.85rem; font-weight: 800; white-space: nowrap;">
             💾 SAVE ALL 127 CITY RATES
           </button>
         </div>
@@ -874,9 +893,14 @@ function renderOrdersTable(orders) {
                 </select>
               </td>
               <td>
-                <button class="btn btn-secondary btn-print-slip" data-id="${o.id}" style="padding: 0.35rem 0.7rem; font-size: 0.75rem;">
-                  📄 Slip
-                </button>
+                <div style="display: flex; gap: 0.4rem; align-items: center;">
+                  <button class="btn btn-secondary btn-print-slip" data-id="${o.id}" style="padding: 0.35rem 0.6rem; font-size: 0.75rem;">
+                    📄 Slip
+                  </button>
+                  <button class="btn btn-delete-single-order" data-id="${o.id}" style="padding: 0.35rem 0.6rem; font-size: 0.75rem; background: rgba(230,57,70,0.2); color: var(--accent-neon); border: 1px solid rgba(230,57,70,0.4); font-weight: 700; cursor: pointer; border-radius: var(--radius-sm);">
+                    🗑️ Delete
+                  </button>
+                </div>
               </td>
             </tr>
           `).join('')}
@@ -892,6 +916,18 @@ function attachTableEventListeners(container, state) {
       const orderId = select.dataset.id;
       const newStatus = e.target.value;
       appStore.updateOrderStatus(orderId, newStatus);
+    });
+  });
+
+  container.querySelectorAll('.btn-delete-single-order').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const orderId = btn.dataset.id;
+      if (confirm(`Are you sure you want to permanently delete order #${orderId} from local storage and Supabase?`)) {
+        btn.disabled = true;
+        btn.innerText = 'Deleting...';
+        await appStore.deleteOrder(orderId);
+        renderAdminDashboard(container, appStore.state);
+      }
     });
   });
 
@@ -1190,7 +1226,7 @@ function openProductEditModal(container, state) {
 
           <div class="form-group">
             <label class="form-label">Available Sizes (Comma Separated)</label>
-            <input type="text" name="sizes" value="${prod.sizes ? prod.sizes.join(', ') : '39, 40, 41, 42, 43, 44'}" class="form-input" placeholder="e.g. 39, 40, 41, 42, 43, 44 OR S, M, L, XL" />
+            <input type="text" name="sizes" value="${prod.sizes && Array.isArray(prod.sizes) ? prod.sizes.join(', ') : (prod.sizes || '39, 40, 41, 42, 43, 44')}" class="form-input" placeholder="e.g. 39, 40, 41, 42, 43, 44 OR S, M, L, XL" />
           </div>
 
           <div class="form-group" style="margin-bottom: 0;">
@@ -1280,9 +1316,14 @@ function openProductEditModal(container, state) {
       inStock: parseInt(fd.get('stock')) > 0
     };
 
-    appStore.saveProduct(prodData);
-    root.classList.remove('active');
-    renderAdminDashboard(container, appStore.state);
+    try {
+      appStore.saveProduct(prodData);
+      root.classList.remove('active');
+      renderAdminDashboard(container, appStore.state);
+    } catch (err) {
+      console.error("Save product failed:", err);
+      appStore.showToast(`Error: ${err.message}`, 'error');
+    }
   });
 }
 

@@ -266,7 +266,7 @@ export function renderHeader(container, state) {
                 <h5 style="font-size: 0.92rem; color: #ffffff; line-height: 1.3; margin-bottom: 0.4rem; font-weight: 700; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${p.name}</h5>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: auto; padding-top: 0.4rem;">
                   <span style="color: var(--accent-gold); font-weight: 800; font-size: 1.05rem;">PKR ${p.price.toLocaleString()}</span>
-                  <span style="font-size: 0.75rem; color: var(--text-muted);">${p.sizes ? p.sizes.slice(0, 3).join(', ') : ''}</span>
+                  <span style="font-size: 0.75rem; color: var(--text-muted);">${p.sizes && Array.isArray(p.sizes) ? p.sizes.slice(0, 3).join(', ') : (p.sizes || '')}</span>
                 </div>
               </div>
             </div>

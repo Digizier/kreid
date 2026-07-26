@@ -164,13 +164,28 @@ class AppStore {
       isCheckoutOpen: false,
       isOrderTrackerOpen: false,
       isWishlistOpen: false,
-      trackedOrder: null,
-      toasts: []
+      toasts: [],
+      
+      // Supabase Configuration & Real-Time Sync Session State
+      supabaseConfig: this.loadStorage('kreid_supabase_config', {
+        url: 'https://aweqcuytubnlkjwvvxgb.supabase.co',
+        anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF3ZXFjdXl0dWJubGtqd3Z2eGdiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUwMzQ3MDAsImV4cCI6MjEwMDYxMDcwMH0.WxxHM5hjtyq8cBN3m21Q6ag_i_96g4tH_fiPpYaMf44',
+        serviceRoleKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF3ZXFjdXl0dWJubGtqd3Z2eGdiIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4NTAzNDcwMCwiZXhwIjoyMTAwNjEwNzAwfQ.UJWjBSyEVfsoyPlIL4yHNwGPWnCd1aO-lHtj0o16ufc',
+        dbName: 'postgres'
+      }),
+      supabaseSession: {
+        status: 'DISCONNECTED',
+        stats: { products: 0, orders: 0, coupons: 0 }
+      },
+      confirmedOrder: null
     };
 
     // Auto check live status & purge old data based on retention settings
     this.checkLiveWhatsAppStatus();
     this.purgeOldWhatsAppLogs();
+
+    // Initialize Supabase Live Connection
+    this.initSupabase();
   }
 
   // Helper storage loader
@@ -202,6 +217,404 @@ class AppStore {
 
   notify() {
     this.subscribers.forEach(cb => cb(this.state));
+  }
+
+  // ==========================================================================
+  // SUPABASE INTEGRATION & REAL-TIME SYNC ENGINE METHODS
+  // ==========================================================================
+
+  async initSupabase() {
+    const config = this.state.supabaseConfig;
+    if (!config.url || !config.anonKey) {
+      this.state.supabaseSession.status = 'DISCONNECTED';
+      this.supabase = null;
+      this.supabaseAdmin = null;
+      return;
+    }
+
+    this.state.supabaseSession.status = 'PROCEEDING_TO_SETUP';
+    this.notify();
+
+    try {
+      // Create public client using anon key
+      this.supabase = window.supabase.createClient(config.url, config.anonKey);
+      
+      // Create admin client using service role key if available, otherwise fallback
+      if (config.serviceRoleKey) {
+        this.supabaseAdmin = window.supabase.createClient(config.url, config.serviceRoleKey);
+      } else {
+        this.supabaseAdmin = this.supabase;
+      }
+
+      // Test connection
+      const { data, error } = await this.supabase.from('products').select('id').limit(1);
+      if (error) throw error;
+
+      this.state.supabaseSession.status = 'CONNECTED';
+      
+      // Sync local state with Supabase data
+      await this.fetchEverythingFromSupabase();
+      
+      // Subscribe to Realtime Updates
+      this.subscribeToRealtime();
+    } catch (e) {
+      console.error('Supabase initialization failed:', e);
+      this.state.supabaseSession.status = 'DISCONNECTED';
+      this.supabase = null;
+      this.supabaseAdmin = null;
+    }
+    this.notify();
+  }
+
+  subscribeToRealtime() {
+    if (!this.supabase) return;
+
+    if (this.productsChannel) this.supabase.removeChannel(this.productsChannel);
+    if (this.ordersChannel) this.supabase.removeChannel(this.ordersChannel);
+    if (this.couponsChannel) this.supabase.removeChannel(this.couponsChannel);
+
+    this.productsChannel = this.supabase
+      .channel('realtime-products')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, async (payload) => {
+        console.log('Realtime products change detected:', payload);
+        if (payload.eventType === 'INSERT' && payload.new) {
+          const exists = this.state.products.some(p => p.id === payload.new.id);
+          if (!exists) {
+            this.state.products.unshift(payload.new);
+            this.saveStorage('kreid_products', this.state.products);
+          }
+        } else if (payload.eventType === 'UPDATE' && payload.new) {
+          const idx = this.state.products.findIndex(p => p.id === payload.new.id);
+          if (idx > -1) {
+            this.state.products[idx] = { ...this.state.products[idx], ...payload.new };
+            this.saveStorage('kreid_products', this.state.products);
+          }
+        } else if (payload.eventType === 'DELETE') {
+          if (payload.old && payload.old.id) {
+            this.state.products = this.state.products.filter(p => p.id !== payload.old.id);
+            this.saveStorage('kreid_products', this.state.products);
+          }
+        }
+        this.updateStats();
+        this.notify();
+      })
+      .subscribe();
+
+    this.ordersChannel = this.supabase
+      .channel('realtime-orders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async (payload) => {
+        console.log('Realtime orders change detected:', payload);
+        if (payload.eventType === 'INSERT' && payload.new) {
+          const exists = this.state.orders.some(o => o.id === payload.new.id);
+          if (!exists) {
+            const formatted = {
+              ...payload.new,
+              subtotal: Number(payload.new.subtotal),
+              discount: Number(payload.new.discount),
+              shippingFee: Number(payload.new.shippingFee),
+              total: Number(payload.new.total)
+            };
+            this.state.orders.unshift(formatted);
+            this.saveStorage('kreid_orders', this.state.orders);
+          }
+        } else if (payload.eventType === 'UPDATE' && payload.new) {
+          const idx = this.state.orders.findIndex(o => o.id === payload.new.id);
+          if (idx > -1) {
+            this.state.orders[idx] = {
+              ...this.state.orders[idx],
+              ...payload.new,
+              subtotal: Number(payload.new.subtotal !== undefined ? payload.new.subtotal : this.state.orders[idx].subtotal),
+              discount: Number(payload.new.discount !== undefined ? payload.new.discount : this.state.orders[idx].discount),
+              shippingFee: Number(payload.new.shippingFee !== undefined ? payload.new.shippingFee : this.state.orders[idx].shippingFee),
+              total: Number(payload.new.total !== undefined ? payload.new.total : this.state.orders[idx].total)
+            };
+            this.saveStorage('kreid_orders', this.state.orders);
+          }
+        } else if (payload.eventType === 'DELETE') {
+          if (payload.old && payload.old.id) {
+            this.state.orders = this.state.orders.filter(o => o.id !== payload.old.id);
+          } else {
+            this.state.orders = [];
+          }
+          this.saveStorage('kreid_orders', this.state.orders);
+        }
+        this.updateStats();
+        this.notify();
+      })
+      .subscribe();
+
+    this.couponsChannel = this.supabase
+      .channel('realtime-coupons')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'coupons' }, async (payload) => {
+        console.log('Realtime coupons change detected:', payload);
+        if (payload.eventType === 'INSERT' && payload.new) {
+          const exists = this.state.coupons.some(c => c.code === payload.new.code);
+          if (!exists) {
+            this.state.coupons.unshift(payload.new);
+            this.saveStorage('kreid_coupons', this.state.coupons);
+          }
+        } else if (payload.eventType === 'UPDATE' && payload.new) {
+          const idx = this.state.coupons.findIndex(c => c.code === payload.new.code);
+          if (idx > -1) {
+            this.state.coupons[idx] = { ...this.state.coupons[idx], ...payload.new };
+            this.saveStorage('kreid_coupons', this.state.coupons);
+          }
+        } else if (payload.eventType === 'DELETE') {
+          if (payload.old && payload.old.code) {
+            this.state.coupons = this.state.coupons.filter(c => c.code !== payload.old.code);
+            this.saveStorage('kreid_coupons', this.state.coupons);
+          }
+        }
+        this.updateStats();
+        this.notify();
+      })
+      .subscribe();
+  }
+
+  async fetchEverythingFromSupabase() {
+    if (!this.supabase) return;
+    await Promise.all([
+      this.fetchProductsFromSupabase(),
+      this.fetchOrdersFromSupabase(),
+      this.fetchCouponsFromSupabase(),
+      this.fetchConfigsFromSupabase(),
+      this.fetchCityRatesFromSupabase()
+    ]);
+    await this.updateStats();
+  }
+
+  async fetchProductsFromSupabase() {
+    if (!this.supabase) return;
+    try {
+      const { data, error } = await this.supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      if (data) {
+        this.state.products = data;
+        this.saveStorage('kreid_products', data);
+      }
+    } catch (e) {
+      console.warn('Error fetching products:', e.message);
+    }
+  }
+
+  async fetchOrdersFromSupabase() {
+    if (!this.supabase) return;
+    try {
+      const { data, error } = await this.supabase
+        .from('orders')
+        .select('*')
+        .order('timestamp', { ascending: false });
+      if (error) throw error;
+      if (data) {
+        this.state.orders = data.map(o => ({
+          ...o,
+          subtotal: Number(o.subtotal),
+          discount: Number(o.discount),
+          shippingFee: Number(o.shippingFee),
+          total: Number(o.total),
+          timestamp: Number(o.timestamp)
+        }));
+        this.saveStorage('kreid_orders', this.state.orders);
+      }
+    } catch (e) {
+      console.warn('Error fetching orders:', e.message);
+    }
+  }
+
+  async fetchCouponsFromSupabase() {
+    if (!this.supabase) return;
+    try {
+      const { data, error } = await this.supabase
+        .from('coupons')
+        .select('*');
+      if (error) throw error;
+      if (data) {
+        this.state.coupons = data.map(c => ({
+          ...c,
+          discountPercent: Number(c.discountPercent),
+          minSpend: Number(c.minSpend)
+        }));
+        this.saveStorage('kreid_coupons', this.state.coupons);
+      }
+    } catch (e) {
+      console.warn('Error fetching coupons:', e.message);
+    }
+  }
+
+  async fetchConfigsFromSupabase() {
+    if (!this.supabase) return;
+    try {
+      const { data, error } = await this.supabase
+        .from('configs')
+        .select('*');
+      if (error) throw error;
+      if (data) {
+        data.forEach(item => {
+          if (item.key === 'paymentSettings') {
+            this.state.paymentSettings = item.value;
+            this.saveStorage('kreid_payment_settings', item.value);
+          } else if (item.key === 'shippingConfig') {
+            this.state.shippingConfig = item.value;
+            this.saveStorage('kreid_shipping_config', item.value);
+          } else if (item.key === 'emailConfig') {
+            this.state.emailConfig = item.value;
+            this.saveStorage('kreid_email_config', item.value);
+          } else if (item.key === 'whatsappConfig') {
+            this.state.whatsappConfig = item.value;
+            this.saveStorage('kreid_wa_config', item.value);
+          }
+        });
+      }
+    } catch (e) {
+      console.warn('Error fetching configs:', e.message);
+    }
+  }
+
+  async fetchCityRatesFromSupabase() {
+    if (!this.supabase) return;
+    try {
+      const { data, error } = await this.supabase
+        .from('city_rates')
+        .select('*');
+      if (error) throw error;
+      if (data && data.length > 0) {
+        const ratesMap = {};
+        data.forEach(row => {
+          ratesMap[row.city] = Number(row.rate);
+        });
+        this.state.cityShippingRates = ratesMap;
+        this.saveStorage('kreid_city_shipping_rates', ratesMap);
+      } else if (data && data.length === 0) {
+        console.log('City rates table is empty in Supabase. Auto-populating default rates...');
+        const cityRows = Object.keys(this.state.cityShippingRates).map(city => ({
+          city: city,
+          rate: this.state.cityShippingRates[city]
+        }));
+        if (cityRows.length > 0 && this.supabaseAdmin) {
+          await this.supabaseAdmin.from('city_rates').upsert(cityRows);
+          console.log('City rates auto-populated successfully!');
+        }
+      }
+    } catch (e) {
+      console.warn('Error fetching city rates:', e.message);
+    }
+  }
+
+  async updateStats() {
+    if (!this.supabase) return;
+    try {
+      const [pRes, oRes, cRes] = await Promise.all([
+        this.supabase.from('products').select('id', { count: 'exact', head: true }),
+        this.supabase.from('orders').select('id', { count: 'exact', head: true }),
+        this.supabase.from('coupons').select('code', { count: 'exact', head: true })
+      ]);
+      this.state.supabaseSession.stats = {
+        products: pRes.count || 0,
+        orders: oRes.count || 0,
+        coupons: cRes.count || 0
+      };
+    } catch (e) {
+      console.warn('Error updating stats:', e.message);
+    }
+  }
+
+  async syncLocalToSupabase() {
+    if (!this.supabaseAdmin) {
+      this.showToast('Please connect to Supabase first!', 'error');
+      return;
+    }
+    
+    this.showToast('Syncing all local data to Supabase database...', 'info');
+    try {
+      // 1. Sync Products
+      if (this.state.products && this.state.products.length > 0) {
+        const { error } = await this.supabaseAdmin
+          .from('products')
+          .upsert(this.state.products);
+        if (error) throw error;
+      }
+
+      // 2. Sync Orders
+      if (this.state.orders && this.state.orders.length > 0) {
+        const { error } = await this.supabaseAdmin
+          .from('orders')
+          .upsert(this.state.orders);
+        if (error) throw error;
+      }
+
+      // 3. Sync Coupons
+      if (this.state.coupons && this.state.coupons.length > 0) {
+        const { error } = await this.supabaseAdmin
+          .from('coupons')
+          .upsert(this.state.coupons.map(c => ({
+            code: c.code,
+            discountPercent: c.discountPercent,
+            minSpend: c.minSpend,
+            isActive: c.isActive,
+            freeShipping: c.freeShipping || false
+          })));
+        if (error) throw error;
+      }
+
+      // 4. Sync Configs
+      const configs = [
+        { key: 'paymentSettings', value: this.state.paymentSettings },
+        { key: 'shippingConfig', value: this.state.shippingConfig },
+        { key: 'emailConfig', value: this.state.emailConfig },
+        { key: 'whatsappConfig', value: this.state.whatsappConfig }
+      ];
+      await this.supabaseAdmin.from('configs').upsert(configs);
+
+      // 5. Sync City Rates
+      if (this.state.cityShippingRates) {
+        const cityRows = Object.keys(this.state.cityShippingRates).map(city => ({
+          city: city,
+          rate: this.state.cityShippingRates[city]
+        }));
+        if (cityRows.length > 0) {
+          await this.supabaseAdmin.from('city_rates').upsert(cityRows);
+        }
+      }
+
+      await this.fetchEverythingFromSupabase();
+      this.showToast('Alhamdulillah! Local data fully synchronized to Supabase.', 'success');
+      this.notify();
+    } catch (e) {
+      console.error('Data sync failed:', e);
+      this.showToast(`Sync failed: ${e.message}`, 'error');
+    }
+  }
+
+  async saveSupabaseConfig(newConfig) {
+    this.state.supabaseConfig = { ...this.state.supabaseConfig, ...newConfig };
+    this.saveStorage('kreid_supabase_config', this.state.supabaseConfig);
+    await this.initSupabase();
+  }
+
+  async disconnectSupabase() {
+    if (this.productsChannel) this.supabase.removeChannel(this.productsChannel);
+    if (this.ordersChannel) this.supabase.removeChannel(this.ordersChannel);
+    if (this.couponsChannel) this.supabase.removeChannel(this.couponsChannel);
+
+    this.supabase = null;
+    this.supabaseAdmin = null;
+    this.state.supabaseSession.status = 'DISCONNECTED';
+    
+    // Fallback to local storage copies
+    const initialProductsData = (await import('../data/products.js')).initialProducts;
+    const initialCityRatesData = (await import('../data/pakistanCities.js')).initialCityRates;
+    
+    this.state.products = this.loadStorage('kreid_products', initialProductsData);
+    this.state.orders = this.loadStorage('kreid_orders', []);
+    this.state.coupons = this.loadStorage('kreid_coupons', []);
+    this.state.paymentSettings = this.loadStorage('kreid_payment_settings', {});
+    this.state.cityShippingRates = this.loadStorage('kreid_city_shipping_rates', initialCityRatesData);
+
+    this.showToast('Disconnected from Supabase. Falling back to local cache.', 'info');
+    this.notify();
   }
 
   // Actions
@@ -298,6 +711,18 @@ class AppStore {
     this.saveStorage('kreid_orders', this.state.orders);
 
     if (purgedCount > 0) {
+      const client = this.supabaseAdmin || this.supabase;
+      if (client) {
+        client
+          .from('orders')
+          .delete()
+          .lt('timestamp', cutoffTimestamp)
+          .then(({ error }) => {
+            if (error) console.error('Supabase purgeOldOrders error:', error.message);
+            else this.updateStats();
+          });
+      }
+
       this.showToast(`Auto-purged ${purgedCount} order records older than ${days} days!`, 'info');
       this.notify();
     }
@@ -305,10 +730,26 @@ class AppStore {
   }
 
   // Complete Wipe All Orders (with "DELETE" confirmation prompt)
-  wipeAllOrders() {
+  async wipeAllOrders() {
     const count = this.state.orders.length;
     this.state.orders = [];
     this.saveStorage('kreid_orders', []);
+
+    // Sync full table wipe to Supabase
+    const client = this.supabaseAdmin || this.supabase;
+    if (client) {
+      try {
+        const { error } = await client
+          .from('orders')
+          .delete()
+          .neq('id', '0');
+        if (error) console.error('Supabase wipeAllOrders error:', error.message);
+        else this.updateStats();
+      } catch (err) {
+        console.error('Supabase wipeAllOrders exception:', err.message);
+      }
+    }
+
     this.showToast(`Permanently deleted all ${count} customer order records!`, 'info');
     this.notify();
     return count;
@@ -433,48 +874,56 @@ class AppStore {
 
   // Primary WhatsApp Gateway Notification Dispatch
   async sendWhatsAppNotification(eventType, orderData) {
-    const phone = orderData.phone || "+92 300 1234567";
-    const templates = this.state.whatsappTemplates;
-    let templateText = templates[eventType] || templates.order_placed || "Hello from KREID COUTURE!";
-
-    // Evaluate and replace all dynamic tags
-    templateText = templateText
-      .replace(/\[Customer Name\]/g, orderData.customerName || 'Valued Customer')
-      .replace(/\[Order ID\]/g, orderData.id || 'N/A')
-      .replace(/\[Total PKR\]/g, orderData.total ? orderData.total.toLocaleString() : '0')
-      .replace(/\[Courier\]/g, orderData.courier || 'Trax Logistics')
-      .replace(/\[Tracking Number\]/g, orderData.trackingNo || 'TRX-101')
-      .replace(/\[Order Status\]/g, orderData.status || 'Processing')
-      .replace(/\[Store Name\]/g, 'KREID COUTURE');
-
-    const endpoint = this.state.whatsappConfig.primaryEndpoint || 'https://localhost-kreid-whatsapp-auto-message.1k6q7u.easypanel.host/api/whatsapp/send';
-
     try {
-      fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone, message: templateText })
-      }).catch(err => console.warn("Background notification dispatch:", err));
-    } catch (e) {}
+      const phone = orderData.phone || "+92 300 1234567";
+      const templates = this.state.whatsappTemplates || {};
+      let templateText = templates[eventType] || templates.order_placed || "Hello from KREID COUTURE!";
 
-    const gatewayUsed = `Easypanel Server (${this.getServerBaseUrl()})`;
+      // Evaluate and replace all dynamic tags
+      templateText = templateText
+        .replace(/\[Customer Name\]/g, orderData.customerName || 'Valued Customer')
+        .replace(/\[Order ID\]/g, orderData.id || 'N/A')
+        .replace(/\[Total PKR\]/g, orderData.total ? orderData.total.toLocaleString() : '0')
+        .replace(/\[Courier\]/g, orderData.courier || 'Trax Logistics')
+        .replace(/\[Tracking Number\]/g, orderData.trackingNo || 'TRX-101')
+        .replace(/\[Order Status\]/g, orderData.status || 'Processing')
+        .replace(/\[Store Name\]/g, 'KREID COUTURE');
 
-    const logItem = {
-      phone,
-      event: eventType.toUpperCase(),
-      gateway: gatewayUsed,
-      timestamp: new Date().toLocaleString('en-US', { hour12: false }),
-      createdAt: Date.now()
-    };
+      const endpoint = (this.state.whatsappConfig && this.state.whatsappConfig.primaryEndpoint) 
+        || 'https://localhost-kreid-whatsapp-auto-message.1k6q7u.easypanel.host/api/whatsapp/send';
 
-    this.state.whatsappLogs.unshift(logItem);
-    this.saveStorage('kreid_wa_logs', this.state.whatsappLogs);
+      try {
+        fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ phone, message: templateText })
+        }).catch(err => console.warn("Background notification dispatch:", err));
+      } catch (e) {}
 
-    // Auto purge old logs during write
-    this.purgeOldWhatsAppLogs();
+      const gatewayUsed = `Easypanel Server (${this.getServerBaseUrl()})`;
 
-    this.showToast(`💬 WhatsApp message dispatched via Easypanel Server to ${phone}!`, 'success');
-    this.notify();
+      const logItem = {
+        phone,
+        event: eventType.toUpperCase(),
+        gateway: gatewayUsed,
+        timestamp: new Date().toLocaleString('en-US', { hour12: false }),
+        createdAt: Date.now()
+      };
+
+      if (!this.state.whatsappLogs) {
+        this.state.whatsappLogs = [];
+      }
+      this.state.whatsappLogs.unshift(logItem);
+      this.saveStorage('kreid_wa_logs', this.state.whatsappLogs);
+
+      // Auto purge old logs during write
+      this.purgeOldWhatsAppLogs();
+
+      this.showToast(`💬 WhatsApp message dispatched via Easypanel Server to ${phone}!`, 'success');
+      this.notify();
+    } catch (err) {
+      console.warn("WhatsApp notification dispatch failed:", err.message);
+    }
   }
 
   toggleWhatsAppConnection() {
@@ -487,6 +936,17 @@ class AppStore {
   updateWhatsAppConfig(newConfig) {
     this.state.whatsappConfig = { ...this.state.whatsappConfig, ...newConfig };
     this.saveStorage('kreid_wa_config', this.state.whatsappConfig);
+    
+    // Save to Supabase
+    if (this.supabaseAdmin) {
+      this.supabaseAdmin
+        .from('configs')
+        .upsert([{ key: 'whatsappConfig', value: this.state.whatsappConfig }])
+        .then(({ error }) => {
+          if (error) console.error('Supabase save whatsappConfig error:', error.message);
+        });
+    }
+
     this.checkLiveWhatsAppStatus();
     this.purgeOldWhatsAppLogs();
     this.showToast('Primary WhatsApp Gateway & Retention Settings Saved!', 'success');
@@ -644,7 +1104,7 @@ class AppStore {
       date: new Date().toLocaleString('en-US', { hour12: false })
     };
 
-    // Deduct stock
+    // Deduct stock locally
     this.state.cart.forEach(cartItem => {
       const prod = this.state.products.find(p => p.id === cartItem.id);
       if (prod) {
@@ -656,21 +1116,59 @@ class AppStore {
     this.state.orders.unshift(newOrder);
     this.saveStorage('kreid_orders', this.state.orders);
     this.saveStorage('kreid_products', this.state.products);
+    
+    // Sync order placement to Supabase
+    if (this.supabase) {
+      this.supabase
+        .from('orders')
+        .insert([newOrder])
+        .then(({ error }) => {
+          if (error) console.error('Supabase order insert failed:', error.message);
+          else this.updateStats();
+        });
+
+      // Deduct stock in Supabase
+      this.state.cart.forEach(cartItem => {
+        const prod = this.state.products.find(p => p.id === cartItem.id);
+        if (prod) {
+          this.supabase
+            .from('products')
+            .update({ stock: prod.stock, inStock: prod.inStock })
+            .eq('id', cartItem.id)
+            .then(({ error }) => {
+              if (error) console.error('Supabase stock update error:', error.message);
+            });
+        }
+      });
+    }
+
+    this.state.confirmedOrder = newOrder;
     this.clearCart();
 
     // Trigger Automated WhatsApp Notification via Easypanel Server
-    this.sendWhatsAppNotification('order_placed', newOrder);
+    try {
+      this.sendWhatsAppNotification('order_placed', newOrder);
+    } catch (err) {
+      console.warn("Background WhatsApp notification dispatch failed:", err.message);
+    }
 
     // Schedule 2-Hour Follow Up Message
-    this.state.whatsappFollowUps.unshift({
-      orderId: newOrder.id,
-      customerName: newOrder.customerName,
-      phone: newOrder.phone,
-      sendTime: "In 2 Hours (" + new Date(Date.now() + 7200000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ")",
-      status: "SCHEDULED",
-      createdAt: Date.now()
-    });
-    this.saveStorage('kreid_wa_followups', this.state.whatsappFollowUps);
+    try {
+      if (!this.state.whatsappFollowUps) {
+        this.state.whatsappFollowUps = [];
+      }
+      this.state.whatsappFollowUps.unshift({
+        orderId: newOrder.id,
+        customerName: newOrder.customerName,
+        phone: newOrder.phone,
+        sendTime: "In 2 Hours (" + new Date(Date.now() + 7200000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ")",
+        status: "SCHEDULED",
+        createdAt: Date.now()
+      });
+      this.saveStorage('kreid_wa_followups', this.state.whatsappFollowUps);
+    } catch (err) {
+      console.warn("Background WhatsApp follow-up scheduling failed:", err.message);
+    }
 
     this.showToast(`🛍️ Order #${newOrder.id} Confirmed!`, 'success');
     this.notify();
@@ -685,6 +1183,17 @@ class AppStore {
       order.status = newStatus;
       this.saveStorage('kreid_orders', this.state.orders);
       
+      // Update in Supabase
+      if (this.supabaseAdmin) {
+        this.supabaseAdmin
+          .from('orders')
+          .update({ status: newStatus })
+          .eq('id', orderId)
+          .then(({ error }) => {
+            if (error) console.error('Supabase order status update failed:', error.message);
+          });
+      }
+
       // Trigger WhatsApp status notification (including 'status_cancelled')
       const eventKey = 'status_' + newStatus.toLowerCase();
       this.sendWhatsAppNotification(eventKey, order);
@@ -699,32 +1208,83 @@ class AppStore {
     }
   }
 
+  async deleteOrder(orderId) {
+    this.state.orders = this.state.orders.filter(o => o.id !== orderId);
+    this.saveStorage('kreid_orders', this.state.orders);
+
+    const client = this.supabaseAdmin || this.supabase;
+    if (client) {
+      try {
+        const { error } = await client
+          .from('orders')
+          .delete()
+          .eq('id', orderId);
+        if (error) console.error('Supabase deleteOrder error:', error.message);
+        else this.updateStats();
+      } catch (err) {
+        console.error('Supabase deleteOrder error:', err.message);
+      }
+    }
+
+    this.showToast(`Order #${orderId} deleted permanently!`, 'info');
+    this.notify();
+  }
+
 
   saveProduct(productData) {
-    if (productData.id) {
-      const index = this.state.products.findIndex(p => p.id === productData.id);
-      if (index > -1) {
-        this.state.products[index] = { ...this.state.products[index], ...productData };
-        this.showToast(`Product "${productData.name}" updated!`, 'success');
-      }
+    const index = this.state.products.findIndex(p => p.id === productData.id);
+    if (index > -1) {
+      // Edit existing product
+      this.state.products[index] = { ...this.state.products[index], ...productData };
+      this.showToast(`Product "${productData.name}" updated!`, 'success');
     } else {
+      // Add new product
       const newProd = {
-        ...productData,
-        id: "prod-" + (this.state.products.length + 1),
         rating: 5.0,
         reviewCount: 1,
-        inStock: (productData.stock > 0)
+        inStock: (productData.stock > 0),
+        ...productData
       };
       this.state.products.unshift(newProd);
       this.showToast(`Product "${newProd.name}" added to catalog!`, 'success');
     }
+    
+    // Save locally
     this.saveStorage('kreid_products', this.state.products);
+    
+    // Save in Supabase
+    if (this.supabaseAdmin) {
+      const targetProd = this.state.products.find(p => p.id === productData.id);
+      if (targetProd) {
+        this.supabaseAdmin
+          .from('products')
+          .upsert([targetProd])
+          .then(({ error }) => {
+            if (error) console.error('Supabase product save failed:', error.message);
+            else this.updateStats();
+          });
+      }
+    }
+
     this.notify();
   }
 
   deleteProduct(productId) {
     this.state.products = this.state.products.filter(p => p.id !== productId);
     this.saveStorage('kreid_products', this.state.products);
+    
+    // Delete from Supabase
+    if (this.supabaseAdmin) {
+      this.supabaseAdmin
+        .from('products')
+        .delete()
+        .eq('id', productId)
+        .then(({ error }) => {
+          if (error) console.error('Supabase product delete failed:', error.message);
+          else this.updateStats();
+        });
+    }
+
     this.showToast(`Product deleted from catalog`, 'info');
     this.notify();
   }
@@ -734,6 +1294,18 @@ class AppStore {
     if (coupon) {
       coupon.isActive = !coupon.isActive;
       this.saveStorage('kreid_coupons', this.state.coupons);
+      
+      // Update in Supabase
+      if (this.supabaseAdmin) {
+        this.supabaseAdmin
+          .from('coupons')
+          .update({ isActive: coupon.isActive })
+          .eq('code', code)
+          .then(({ error }) => {
+            if (error) console.error('Supabase coupon status update failed:', error.message);
+          });
+      }
+
       this.showToast(`Coupon ${code} is now ${coupon.isActive ? 'ACTIVE' : 'DEACTIVATED'}`, 'info');
       this.notify();
     }
@@ -742,6 +1314,19 @@ class AppStore {
   deleteCoupon(code) {
     this.state.coupons = this.state.coupons.filter(c => c.code !== code);
     this.saveStorage('kreid_coupons', this.state.coupons);
+    
+    // Delete from Supabase
+    if (this.supabaseAdmin) {
+      this.supabaseAdmin
+        .from('coupons')
+        .delete()
+        .eq('code', code)
+        .then(({ error }) => {
+          if (error) console.error('Supabase coupon delete failed:', error.message);
+          else this.updateStats();
+        });
+    }
+
     this.showToast(`Coupon ${code} removed`, 'info');
     this.notify();
   }
@@ -754,7 +1339,27 @@ class AppStore {
     } else {
       this.state.coupons.push({ ...couponData, code: cleanCode, isActive: true });
     }
+    
     this.saveStorage('kreid_coupons', this.state.coupons);
+    
+    // Save to Supabase
+    if (this.supabaseAdmin) {
+      const targetCoupon = this.state.coupons.find(c => c.code === cleanCode);
+      this.supabaseAdmin
+        .from('coupons')
+        .upsert([{
+          code: targetCoupon.code,
+          discountPercent: targetCoupon.discountPercent,
+          minSpend: targetCoupon.minSpend,
+          isActive: targetCoupon.isActive,
+          freeShipping: targetCoupon.freeShipping || false
+        }])
+        .then(({ error }) => {
+          if (error) console.error('Supabase coupon save failed:', error.message);
+          else this.updateStats();
+        });
+    }
+
     this.showToast(`Coupon code ${cleanCode} saved!`, 'success');
     this.notify();
   }
@@ -762,6 +1367,17 @@ class AppStore {
   savePaymentSettings(newSettings) {
     this.state.paymentSettings = { ...this.state.paymentSettings, ...newSettings };
     this.saveStorage('kreid_payment_settings', this.state.paymentSettings);
+    
+    // Save to Supabase
+    if (this.supabaseAdmin) {
+      this.supabaseAdmin
+        .from('configs')
+        .upsert([{ key: 'paymentSettings', value: this.state.paymentSettings }])
+        .then(({ error }) => {
+          if (error) console.error('Supabase configs save failed:', error.message);
+        });
+    }
+
     this.showToast(`Payment account settings updated!`, 'success');
     this.notify();
   }
@@ -791,14 +1407,37 @@ class AppStore {
   saveShippingConfig(newConfig) {
     this.state.shippingConfig = { ...this.state.shippingConfig, ...newConfig };
     this.saveStorage('kreid_shipping_config', this.state.shippingConfig);
+    
+    // Save to Supabase
+    if (this.supabaseAdmin) {
+      this.supabaseAdmin
+        .from('configs')
+        .upsert([{ key: 'shippingConfig', value: this.state.shippingConfig }])
+        .then(({ error }) => {
+          if (error) console.error('Supabase save shippingConfig error:', error.message);
+        });
+    }
+
     this.showToast('City Location & Additional Product Shipping rules saved!', 'success');
     this.notify();
   }
 
   saveCityShippingRate(cityName, ratePkr) {
     if (!this.state.cityShippingRates) this.state.cityShippingRates = {};
-    this.state.cityShippingRates[cityName] = parseFloat(ratePkr) || 250;
+    const rate = parseFloat(ratePkr) || 250;
+    this.state.cityShippingRates[cityName] = rate;
     this.saveStorage('kreid_city_shipping_rates', this.state.cityShippingRates);
+    
+    // Save to Supabase
+    if (this.supabaseAdmin) {
+      this.supabaseAdmin
+        .from('city_rates')
+        .upsert([{ city: cityName, rate: rate }])
+        .then(({ error }) => {
+          if (error) console.error('Supabase saveCityShippingRate error:', error.message);
+        });
+    }
+
     this.showToast(`Delivery rate for ${cityName} updated to PKR ${ratePkr}!`, 'success');
     this.notify();
   }
@@ -806,6 +1445,21 @@ class AppStore {
   saveAllCityShippingRates(ratesMap) {
     this.state.cityShippingRates = { ...this.state.cityShippingRates, ...ratesMap };
     this.saveStorage('kreid_city_shipping_rates', this.state.cityShippingRates);
+    
+    // Save to Supabase
+    if (this.supabaseAdmin) {
+      const cityRows = Object.keys(ratesMap).map(city => ({
+        city: city,
+        rate: parseFloat(ratesMap[city]) || 250
+      }));
+      this.supabaseAdmin
+        .from('city_rates')
+        .upsert(cityRows)
+        .then(({ error }) => {
+          if (error) console.error('Supabase saveAllCityShippingRates error:', error.message);
+        });
+    }
+
     this.showToast('Alhamdulillah! All 127 Pakistani city delivery rates saved!', 'success');
     this.notify();
   }
@@ -834,10 +1488,20 @@ class AppStore {
   }
 
 
-  // Resend Email Helper Methods
   updateEmailConfig(newConfig) {
     this.state.emailConfig = { ...this.state.emailConfig, ...newConfig };
     this.saveStorage('kreid_email_config', this.state.emailConfig);
+    
+    // Save to Supabase
+    if (this.supabaseAdmin) {
+      this.supabaseAdmin
+        .from('configs')
+        .upsert([{ key: 'emailConfig', value: this.state.emailConfig }])
+        .then(({ error }) => {
+          if (error) console.error('Supabase save emailConfig error:', error.message);
+        });
+    }
+
     this.showToast('Resend Email Gateway settings saved!', 'success');
     this.notify();
   }
@@ -876,6 +1540,11 @@ class AppStore {
     this.saveStorage('kreid_email_logs', []);
     this.notify();
     return count;
+  }
+
+  clearConfirmedOrder() {
+    this.state.confirmedOrder = null;
+    this.notify();
   }
 
   // Toast System
